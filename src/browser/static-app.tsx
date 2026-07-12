@@ -273,11 +273,7 @@ const scenarioConfig = (): ScenarioConfig => {
   const storedModel = localStorage.getItem("scenario-model") || "";
   return {
     provider,
-    model:
-      provider === "openrouter" &&
-      (!storedModel || storedModel === "openrouter/free" || storedModel.endsWith(":free"))
-        ? "openrouter/free"
-        : storedModel,
+    model: provider === "openrouter" ? "openrouter/free" : storedModel,
     apiKey: sessionStorage.getItem("scenario-api-key") || "",
   };
 };
