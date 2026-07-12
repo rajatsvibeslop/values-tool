@@ -282,6 +282,11 @@ const scenarioConfig = (): ScenarioConfig => {
   };
 };
 const scenarioGenerationInFlight = new Map<string, Promise<GeneratedScenario>>();
+const OPENROUTER_FREE_MODELS = [
+  "qwen/qwen3-next-80b-a3b-instruct:free",
+  "google/gemma-4-26b-a4b-it:free",
+  "openrouter/free",
+];
 const delay = (milliseconds: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 const Page = ({
@@ -1670,10 +1675,18 @@ function RapidCompare({
   const requestHostedScenario = (
     target: RapidQuestion,
     config: ScenarioConfig,
+    attempt = 0,
   ): Promise<GeneratedScenario> => {
     const existing = scenarioGenerationInFlight.get(target.id);
     if (existing) return existing;
-    const request = scenarioProvider(config)
+    const routedConfig =
+      config.provider === "openrouter" && config.model === "openrouter/free"
+        ? {
+            ...config,
+            model: OPENROUTER_FREE_MODELS[attempt % OPENROUTER_FREE_MODELS.length]!,
+          }
+        : config;
+    const request = scenarioProvider(routedConfig)
       .generate(scenarioRequest(target))
       .finally(() => scenarioGenerationInFlight.delete(target.id));
     scenarioGenerationInFlight.set(target.id, request);
@@ -1698,7 +1711,7 @@ function RapidCompare({
     let lastError = "Scenario generation failed";
     for (let attempt = 0; attempt < attempts; attempt++) {
       try {
-        const generated = await requestHostedScenario(question, config);
+        const generated = await requestHostedScenario(question, config, attempt);
         if (!interactionStarted.current) {
           await repo.updateRapidScenario(session.id, generated, question.id);
           if (!interactionStarted.current) setScenario(generated);
@@ -1737,7 +1750,11 @@ function RapidCompare({
         const target = prepared[cursor++]!;
         for (let attempt = 0; attempt < 2; attempt++) {
           try {
-            const generated = await requestHostedScenario(target, config);
+            const generated = await requestHostedScenario(
+              target,
+              config,
+              retryRound * 2 + attempt,
+            );
             await repo.updatePreparedRapidScenario(session.id, target.id, generated);
             const updated = repo.preparedRapidQuestions(session.id);
             setBufferStatus({
@@ -1763,21 +1780,22 @@ function RapidCompare({
 
   useEffect(() => {
     const config = scenarioConfig();
-    const needsCurrentScenario =
+    const currentNeedsScenario =
       config.provider !== "local" &&
       config.apiKey &&
       (scenario.provider === "local" ||
-        (scenario.choices?.filter((choice) => choice.focalValueId).length ?? 0) < 2) &&
-      attempted.current !== question.id;
-    if (needsCurrentScenario) {
-      attempted.current = question.id;
-      void (async () => {
-        await generateScenario(true);
-        await prefetchScenarioBuffer();
-      })();
-    } else {
-      void prefetchScenarioBuffer();
+        (scenario.choices?.filter((choice) => choice.focalValueId).length ?? 0) < 2);
+    if (currentNeedsScenario) {
+      if (attempted.current !== question.id) {
+        attempted.current = question.id;
+        void (async () => {
+          await generateScenario(true);
+          await prefetchScenarioBuffer();
+        })();
+      }
+      return;
     }
+    void prefetchScenarioBuffer();
     // Generation is keyed by question id and shared across component lifetimes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [question.id]);

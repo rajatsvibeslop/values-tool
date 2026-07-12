@@ -297,7 +297,7 @@ export class OpenAICompatibleScenarioProvider implements ScenarioProvider {
     const obsoleteFreeModel = configuredModel === "deepseek/deepseek-v4-flash:free";
     const model = openRouter
       ? !configuredModel || obsoleteFreeModel
-        ? "openrouter/free"
+        ? "qwen/qwen3-next-80b-a3b-instruct:free"
         : configuredModel
       : configuredModel || "deepseek-v4-flash";
     const response = await fetch(endpoint, {
