@@ -145,6 +145,7 @@ button, input, textarea, select, summary, a { outline-offset: 2px; }
 .scenario-choice-copy { display: grid; gap: 3px; }
 .scenario-choice-copy strong { font-size: 11px; text-transform: uppercase; }
 .scenario-actions > .btn { justify-self: start; }
+.scenario-action-footer { display: flex; gap: 8px; }
 .rapid-rank-list { display: grid; border-top: 2px solid var(--text); }
 .rapid-rank-row { min-height: 88px; padding: 12px 14px; background: var(--surface); border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 38px 24px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
 .rapid-rank-row:focus-within { background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface)); }

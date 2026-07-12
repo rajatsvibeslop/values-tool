@@ -1723,11 +1723,6 @@ function RapidCompare({
           <p>{generating ? "Creating a neutral decision context…" : scenario.text}</p>
           {scenarioError && <div className="small badge-danger">{scenarioError}</div>}
         </div>
-        {scenarioConfig().provider !== "local" && useScenarioChoices && (
-          <button className="btn btn-sm" disabled={generating} onClick={() => void generateScenario(false)}>
-            <RefreshCw size={13} /> New scenario
-          </button>
-        )}
       </section>
       {generating ? (
         <div className="scenario-loading muted">Preparing three possible actions…</div>
@@ -1753,11 +1748,16 @@ function RapidCompare({
               </button>
             ))}
           </div>
-          {mostChoiceId && (
-            <button className="btn btn-sm" type="button" onClick={() => setMostChoiceId("")}>
-              Change most-like choice
+          <div className="scenario-action-footer">
+            {mostChoiceId && (
+              <button className="btn btn-sm" type="button" onClick={() => setMostChoiceId("")}>
+                Change most-like choice
+              </button>
+            )}
+            <button className="btn btn-sm" type="button" onClick={() => void generateScenario(false)}>
+              None fit
             </button>
-          )}
+          </div>
         </section>
       ) : hostedScenarioMode ? (
         <div className="scenario-loading">

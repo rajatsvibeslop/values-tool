@@ -122,7 +122,8 @@ portrait a focal value before generation; the LLM only verbalizes those assignme
 never decides how an answer should be scored. The user chooses the person most and least
 like them, producing a conservative order over the three focal values.
 Scenario sessions regenerate invalid actions instead of falling back to visible value
-sorting; direct ordering remains a separate method when no hosted provider is configured.
+sorting. **None fit** requests another stimulus without updating ratings; direct ordering
+remains a separate method when no hosted provider is configured.
 Configure the generator in
 **Settings > Decision scenarios**:
 

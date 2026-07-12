@@ -134,7 +134,9 @@ test("stores hosted scenario credentials only for the browser tab", async ({ pag
   await page.locator(".panel").filter({ has: page.getByRole("heading", { name: "Decision scenarios" }) }).getByRole("button", { name: "Save", exact: true }).click();
   expect(await page.evaluate(() => sessionStorage.getItem("scenario-api-key"))).toBe("test-session-key");
   expect(await page.evaluate(() => localStorage.getItem("scenario-provider"))).toBe("openrouter");
+  let scenarioRequests = 0;
   await page.route("https://openrouter.ai/api/v1/chat/completions", (route) => {
+    scenarioRequests += 1;
     const body = route.request().postDataJSON() as {
       max_tokens: number;
       response_format: { type: string; json_schema: { strict: boolean } };
@@ -165,6 +167,9 @@ test("stores hosted scenario credentials only for the browser tab", async ({ pag
   await page.getByRole("button", { name: "Start session" }).click();
   await expect(page.getByText(/secure familiar role/)).toBeVisible();
   await expect(page.locator(".scenario-choice")).toHaveCount(3);
+  await page.getByRole("button", { name: "None fit" }).click();
+  await expect.poll(() => scenarioRequests).toBe(2);
+  await expect(page.getByText("1/8", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: /Accept the secure role/ }).click();
   await expect(page.getByText("Who is least like you?")).toBeVisible();
   await page.getByRole("button", { name: /Negotiate a short trial/ }).click();
