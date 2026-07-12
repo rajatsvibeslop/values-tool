@@ -116,7 +116,11 @@ reduce sample complexity relative to pairwise feedback. See Saha and Gopalan,
 
 ## Automatic Scenarios
 
-Every rapid question receives a scenario automatically. Configure the generator in
+Every rapid question receives a scenario automatically. Hosted generators also create
+three short courses of action with hidden value-order mappings. Choosing the action the
+user would actually take records the implied order and the original action as provenance;
+direct five-value ordering remains available when the generated actions do not fit.
+Configure the generator in
 **Settings > Decision scenarios**:
 
 - **On-device:** always available; composes a decision frame from the current value

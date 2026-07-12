@@ -994,6 +994,7 @@ export class BrowserRepository {
     orderedValueIds: string[];
     contexts: string[];
     reasoning?: string;
+    scenarioChoiceId?: string;
   }): Promise<void> {
     const question = this.rapidQuestion(input.sessionId);
     if (!question) throw new Error("Rapid question not found");
@@ -1002,6 +1003,14 @@ export class BrowserRepository {
       [...input.orderedValueIds].sort().join(":") !== [...question.valueIds].sort().join(":")
     )
       throw new Error("The submitted order does not match the active question");
+    const scenarioChoice = input.scenarioChoiceId
+      ? question.scenario.choices?.find((choice) => choice.id === input.scenarioChoiceId)
+      : undefined;
+    if (
+      input.scenarioChoiceId &&
+      (!scenarioChoice || scenarioChoice.valueOrder.join(":") !== input.orderedValueIds.join(":"))
+    )
+      throw new Error("The selected scenario action does not match the active question");
     const decisions = adjacentDecisions(input.orderedValueIds);
     const eventIds = decisions.map(() => uid());
     const stamp = now();
@@ -1014,7 +1023,8 @@ export class BrowserRepository {
           [
             eventId, input.sessionId, input.setId, decision.leftValueId,
             decision.rightValueId, "left", "moderate", "confident", "intrinsic",
-            json(["multiway"]), json(eventIds.filter((id) => id !== eventId)),
+            json(scenarioChoice ? ["multiway", "scenario-choice"] : ["multiway"]),
+            json(eventIds.filter((id) => id !== eventId)),
             null, "", 0, `rapid-ranking:${question.id}:${index + 1}/${decisions.length}`,
             1, stamp + index, stamp + index,
           ],
@@ -1031,6 +1041,12 @@ export class BrowserRepository {
           if (input.reasoning)
             this.db.run("INSERT INTO comparison_notes VALUES (?,?,?,?,?)", [
               uid(), eventId, "reasoning", input.reasoning, stamp,
+            ]);
+          if (scenarioChoice)
+            this.db.run("INSERT INTO comparison_notes VALUES (?,?,?,?,?)", [
+              uid(), eventId, "scenario_choice",
+              `Selected action ${scenarioChoice.id}: ${scenarioChoice.text}`,
+              stamp,
             ]);
         }
       });

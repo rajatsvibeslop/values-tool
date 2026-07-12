@@ -1,4 +1,5 @@
 export interface ScenarioValue {
+  id?: string;
   name: string;
   definition: string;
   category: string;
@@ -16,6 +17,13 @@ export interface GeneratedScenario {
   provider: string;
   model: string;
   generatedAt: string;
+  choices?: ScenarioChoice[];
+}
+
+export interface ScenarioChoice {
+  id: string;
+  text: string;
+  valueOrder: string[];
 }
 
 export interface ScenarioProvider {
@@ -50,20 +58,103 @@ export function deriveScenario(input: ScenarioRequest): GeneratedScenario {
 }
 
 function scenarioPrompt(input: ScenarioRequest) {
-  return `Create one concrete, realistic decision scenario for a personal-values ranking exercise.
+  const actionCount = Math.min(3, input.values.length);
+  const finalLabel = String.fromCharCode(64 + actionCount);
+  const exampleOrder = input.values.map((_, index) => index).join(",");
+  return `Create one concrete, realistic decision scenario and ${actionCount} possible actions for a personal-values ranking exercise.
 
 Requirements:
 - Make all supplied values genuinely relevant and in tension.
 - Do not name the values or reveal a preferred answer.
 - Use the supplied definitions, not stereotypes about the labels.
 - Use the context and session purpose when supplied.
-- Write 2 concise sentences, under 70 words total.
-- Return only JSON: {"scenario":"..."}.
+- Write the scenario in 2 concise sentences, under 70 words total.
+- Write ${actionCount} distinct, concrete actions labeled A through ${finalLabel}, each under 24 words.
+- Keep every action plausible. Each action must prioritize a different supplied value first,
+  while also implying a complete priority order over all five values.
+- For each action, include that hidden order as value_order: a permutation of the integer
+  indices 0 through ${input.values.length - 1}. The action text must not reveal those indices or value names.
+- Return only JSON in this shape:
+  {"scenario":"...","choices":[{"id":"A","action":"...","value_order":[${exampleOrder}]}]}.
 
 Context: ${input.contexts.join(", ") || "General life"}
 Purpose: ${input.purpose || "Clarify personal priorities"}
 Values:
-${input.values.map((value) => `- ${value.name}: ${value.definition || "No definition supplied"} (${value.category || "uncategorized"})`).join("\n")}`;
+${input.values.map((value, index) => `${index}. ${value.name}: ${value.definition || "No definition supplied"} (${value.category || "uncategorized"})`).join("\n")}`;
+}
+
+function contentText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) return content.map(contentText).filter(Boolean).join("");
+  if (!content || typeof content !== "object") return "";
+  const part = content as { text?: unknown; content?: unknown };
+  if (typeof part.text === "string") return part.text;
+  return contentText(part.content);
+}
+
+export function extractScenarioText(content: unknown): string {
+  const raw = contentText(content)
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+  if (!raw) return "";
+  try {
+    const parsed = JSON.parse(raw) as { scenario?: unknown; text?: unknown };
+    const scenario = contentText(parsed.scenario ?? parsed.text).trim();
+    return scenario || raw;
+  } catch {
+    return raw;
+  }
+}
+
+export function extractScenarioChoices(
+  content: unknown,
+  values: ScenarioValue[],
+): ScenarioChoice[] {
+  const raw = contentText(content)
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as {
+      choices?: unknown;
+      options?: unknown;
+    };
+    const options = parsed.choices ?? parsed.options;
+    if (!Array.isArray(options)) return [];
+    return options.flatMap((option, optionIndex) => {
+      if (!option || typeof option !== "object") return [];
+      const item = option as {
+        id?: unknown;
+        action?: unknown;
+        text?: unknown;
+        value_order?: unknown;
+        valueOrder?: unknown;
+        priority_order?: unknown;
+      };
+      const text = contentText(item.action ?? item.text).trim();
+      const rawOrder = item.value_order ?? item.valueOrder ?? item.priority_order;
+      if (!text || !Array.isArray(rawOrder) || rawOrder.length !== values.length) return [];
+      const indices = rawOrder.map((index) =>
+        typeof index === "number" ? index : Number.parseInt(String(index), 10),
+      );
+      if (
+        indices.some((index) => !Number.isInteger(index) || index < 0 || index >= values.length) ||
+        new Set(indices).size !== values.length
+      )
+        return [];
+      return [{
+        id: typeof item.id === "string" && item.id.trim() ? item.id.trim() : String.fromCharCode(65 + optionIndex),
+        text: clean(text),
+        valueOrder: indices.map((index) => values[index]!.id ?? values[index]!.name),
+      }];
+    });
+  } catch {
+    return [];
+  }
 }
 
 export class OpenAICompatibleScenarioProvider implements ScenarioProvider {
@@ -100,30 +191,41 @@ export class OpenAICompatibleScenarioProvider implements ScenarioProvider {
           { role: "user", content: scenarioPrompt(input) },
         ],
         temperature: 0.7,
-        max_tokens: 180,
+        // The free router can select a mandatory-reasoning model. Its internal
+        // tokens share this budget, so leave room for a short final answer.
+        max_tokens: openRouter ? 1_400 : 400,
         response_format: { type: "json_object" },
+        ...(openRouter
+          ? { reasoning: { effort: "low", exclude: true } }
+          : { thinking: { type: "disabled" } }),
       }),
     });
     const payload = (await response.json()) as {
-      choices?: { message?: { content?: string } }[];
+      choices?: {
+        finish_reason?: string;
+        message?: { content?: unknown };
+        delta?: { content?: unknown };
+        text?: unknown;
+      }[];
       error?: { message?: string };
+      model?: string;
     };
-    if (!response.ok)
+    if (!response.ok || payload.error)
       throw new Error(payload.error?.message || `Scenario request failed (${response.status})`);
-    const content = payload.choices?.[0]?.message?.content;
-    if (!content) throw new Error("The scenario provider returned no text");
-    let scenario = content;
-    try {
-      scenario = (JSON.parse(content) as { scenario?: string }).scenario || content;
-    } catch {
-      scenario = content.replace(/^```(?:json)?|```$/g, "").trim();
+    const choice = payload.choices?.[0];
+    const content = choice?.message?.content ?? choice?.delta?.content ?? choice?.text;
+    const scenario = extractScenarioText(content);
+    if (!scenario) {
+      const suffix = choice?.finish_reason === "length" ? " (output limit reached)" : "";
+      throw new Error(`The hosted model did not produce a final scenario${suffix}`);
     }
     if (scenario.length < 20) throw new Error("The generated scenario was too short");
     return {
       text: clean(scenario),
       provider: this.config.provider,
-      model,
+      model: payload.model || model,
       generatedAt: new Date().toISOString(),
+      choices: extractScenarioChoices(content, input.values),
     };
   }
 }

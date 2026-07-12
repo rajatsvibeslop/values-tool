@@ -6,6 +6,7 @@ import {
   ArrowUp,
   BarChart3,
   Check,
+  ChevronRight,
   Database,
   Download,
   FileText,
@@ -53,6 +54,7 @@ import Papa from "papaparse";
 import {
   OpenAICompatibleScenarioProvider,
   type HostedScenarioProvider,
+  type ScenarioChoice,
 } from "@/domain/scenarios";
 
 type Route =
@@ -1554,6 +1556,8 @@ function RapidCompare({
   const [scenarioError, setScenarioError] = useState("");
   const [generating, setGenerating] = useState(false);
   const [notes, setNotes] = useState(false);
+  const [directRanking, setDirectRanking] = useState(false);
+  const [choosing, setChoosing] = useState(false);
   const attempted = useRef("");
   const sessionContextIds = db
     .query<{ context_id: string }>(
@@ -1582,6 +1586,7 @@ function RapidCompare({
       });
       const generated = await provider.generate({
         values: questionValues.map((value) => ({
+          id: value.id,
           name: value.name,
           definition: value.personal_definition || value.short_definition,
           category: value.parent_category,
@@ -1593,7 +1598,9 @@ function RapidCompare({
       setScenario(generated);
       await mutate(() => repo.updateRapidScenario(session.id, generated));
     } catch (cause) {
-      setScenarioError(cause instanceof Error ? cause.message : String(cause));
+      sessionStorage.removeItem(`scenario-request:${question.id}`);
+      const message = cause instanceof Error ? cause.message : String(cause);
+      setScenarioError(`${message}. Using the on-device scenario.`);
     } finally {
       setGenerating(false);
     }
@@ -1635,6 +1642,26 @@ function RapidCompare({
       next.splice(target, 0, sourceId);
       return next;
     });
+  const scenarioChoices = (scenario.choices ?? []).filter(
+    (choice) =>
+      choice.valueOrder.length === question.valueIds.length &&
+      [...choice.valueOrder].sort().join(":") === [...question.valueIds].sort().join(":"),
+  );
+  const useScenarioChoices = scenarioChoices.length >= 2 && !directRanking;
+  const chooseScenario = async (choice: ScenarioChoice) => {
+    if (choosing) return;
+    setChoosing(true);
+    await mutate(() =>
+      repo.submitRapidRanking({
+        sessionId: session.id,
+        setId: session.value_set_id,
+        orderedValueIds: choice.valueOrder,
+        contexts: sessionContextIds,
+        scenarioChoiceId: choice.id,
+      }),
+    );
+    setChoosing(false);
+  };
 
   return (
     <Page
@@ -1664,12 +1691,12 @@ function RapidCompare({
       <div className="ordering-strip rapid-strip">
         <div>
           <span className="ordering-label">QUESTION {question.question} OF {question.budget}</span>
-          <strong>Rank what should matter most.</strong>
+          <strong>{useScenarioChoices ? "What would you do?" : "Order what matters."}</strong>
         </div>
         <div className="ordering-progress">
           <span style={{ width: `${((question.question - 1) / question.budget) * 100}%` }} />
         </div>
-        <span className="mono muted">5 at a time</span>
+        <span className="mono muted">{useScenarioChoices ? "one decision" : "5 at a time"}</span>
       </div>
       <section className="scenario-band" aria-live="polite">
         <Sparkles size={18} />
@@ -1686,7 +1713,30 @@ function RapidCompare({
           </button>
         )}
       </section>
-      <form
+      {generating ? (
+        <div className="scenario-loading muted">Preparing three possible actions…</div>
+      ) : useScenarioChoices ? (
+        <section className="scenario-actions" aria-label="Possible actions">
+          <div className="scenario-choice-list">
+            {scenarioChoices.map((choice, index) => (
+              <button
+                className="scenario-choice"
+                disabled={choosing}
+                key={`${choice.id}:${index}`}
+                onClick={() => void chooseScenario(choice)}
+                type="button"
+              >
+                <span className="scenario-choice-key">{index + 1}</span>
+                <span>{choice.text}</span>
+                <ChevronRight size={17} aria-hidden="true" />
+              </button>
+            ))}
+          </div>
+          <button className="btn btn-sm" type="button" onClick={() => setDirectRanking(true)}>
+            Compare values instead
+          </button>
+        </section>
+      ) : <form
         onSubmit={(event) => {
           const data = submit(event);
           mutate(() =>
@@ -1731,6 +1781,11 @@ function RapidCompare({
           })}
         </div>
         <div className="rapid-submit">
+          {scenarioChoices.length >= 2 && (
+            <button type="button" className="btn" onClick={() => setDirectRanking(false)}>
+              Back to actions
+            </button>
+          )}
           <button type="button" className="btn" onClick={() => setNotes((value) => !value)}>
             Add note
           </button>
@@ -1739,7 +1794,7 @@ function RapidCompare({
             <Check size={15} /> Use this order
           </button>
         </div>
-      </form>
+      </form>}
     </Page>
   );
 }

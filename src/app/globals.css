@@ -134,6 +134,14 @@ button, input, textarea, select, summary, a { outline-offset: 2px; }
 .scenario-band { min-height: 104px; margin-bottom: 14px; padding: 18px 20px; border: 1px solid var(--border); border-left: 4px solid var(--warning); background: var(--surface); display: grid; grid-template-columns: auto 1fr auto; align-items: start; gap: 14px; }
 .scenario-band p { margin: 5px 0 0; max-width: 900px; font-size: 16px; line-height: 1.45; }
 .scenario-label { font-family: "IBM Plex Mono", monospace; color: var(--muted); font-size: 10px; font-weight: 600; }
+.scenario-loading { min-height: 190px; display: grid; place-items: center; border-top: 2px solid var(--text); }
+.scenario-actions { display: grid; gap: 12px; }
+.scenario-choice-list { display: grid; border-top: 2px solid var(--text); }
+.scenario-choice { width: 100%; min-height: 72px; padding: 12px 14px; border: 0; border-bottom: 1px solid var(--border); background: var(--surface); color: var(--text); display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 14px; text-align: left; font: inherit; font-size: 16px; line-height: 1.35; cursor: pointer; }
+.scenario-choice:hover, .scenario-choice:focus-visible { background: var(--accent-soft); color: var(--accent); }
+.scenario-choice:disabled { opacity: .5; cursor: wait; }
+.scenario-choice-key { width: 28px; height: 28px; border: 1px solid currentColor; display: grid; place-items: center; font-family: "IBM Plex Mono", monospace; font-size: 12px; font-weight: 600; }
+.scenario-actions > .btn { justify-self: start; }
 .rapid-rank-list { display: grid; border-top: 2px solid var(--text); }
 .rapid-rank-row { min-height: 88px; padding: 12px 14px; background: var(--surface); border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 38px 24px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
 .rapid-rank-row:focus-within { background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface)); }
