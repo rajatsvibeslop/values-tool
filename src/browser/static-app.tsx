@@ -280,6 +280,14 @@ const submit = (event: FormEvent<HTMLFormElement>) => {
   event.preventDefault();
   return new FormData(event.currentTarget);
 };
+const parsedStringList = (value: string) => {
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch {
+    return [];
+  }
+};
 
 function useSelectedSet(repo: BrowserRepository) {
   const sets = repo.sets();
@@ -544,6 +552,80 @@ function ValuesView({ repo, db, mutate }: ViewProps) {
                 <Plus size={14} /> Create set
               </button>
             </form>
+            {set && (
+              <details style={{ marginTop: 12 }}>
+                <summary>Set actions</summary>
+                <div className="stack" style={{ marginTop: 10 }}>
+                  <form
+                    className="stack"
+                    onSubmit={(event) => {
+                      const data = submit(event);
+                      mutate(() =>
+                        repo.updateSet(set.id, {
+                          name: String(data.get("name")),
+                          description: String(data.get("description")),
+                          archived: Boolean(data.get("archived")),
+                        }),
+                      );
+                    }}
+                  >
+                    <Field label="Set name">
+                      <input
+                        className="input"
+                        name="name"
+                        defaultValue={set.name}
+                      />
+                    </Field>
+                    <Field label="Description">
+                      <input
+                        className="input"
+                        name="description"
+                        defaultValue={set.description}
+                      />
+                    </Field>
+                    <label className="check-row">
+                      <input type="checkbox" name="archived" /> Archive set
+                    </label>
+                    <button className="btn">Save set</button>
+                  </form>
+                  <hr className="divider" />
+                  <form
+                    className="stack"
+                    onSubmit={(event) => {
+                      const data = submit(event);
+                      mutate(async () => {
+                        const result = await repo.cloneOrMergeSets(
+                          data.getAll("sets").map(String),
+                          String(data.get("name")),
+                        );
+                        select(result.id);
+                      });
+                    }}
+                  >
+                    <Field label="Clone or merge into">
+                      <input
+                        className="input"
+                        name="name"
+                        defaultValue={`${set.name} copy`}
+                        required
+                      />
+                    </Field>
+                    {sets.map((item) => (
+                      <label className="check-row small" key={item.id}>
+                        <input
+                          type="checkbox"
+                          name="sets"
+                          value={item.id}
+                          defaultChecked={item.id === set.id}
+                        />{" "}
+                        {item.name}
+                      </label>
+                    ))}
+                    <button className="btn">Create combined set</button>
+                  </form>
+                </div>
+              </details>
+            )}
           </Panel>
           {set && (
             <Panel
@@ -701,6 +783,14 @@ function ValueProfile({
                 name: String(data.get("name")),
                 definition: String(data.get("definition")),
                 category: String(data.get("category")),
+                aliases: String(data.get("aliases"))
+                  .split(",")
+                  .map((item) => item.trim())
+                  .filter(Boolean),
+                tags: String(data.get("tags"))
+                  .split(",")
+                  .map((item) => item.trim())
+                  .filter(Boolean),
               }),
             );
           }}
@@ -722,6 +812,22 @@ function ValueProfile({
               defaultValue={value.parent_category}
             />
           </Field>
+          <div className="form-grid">
+            <Field label="Aliases">
+              <input
+                className="input"
+                name="aliases"
+                defaultValue={(value.aliases ?? []).join(", ")}
+              />
+            </Field>
+            <Field label="Tags">
+              <input
+                className="input"
+                name="tags"
+                defaultValue={parsedStringList(value.tags).join(", ")}
+              />
+            </Field>
+          </div>
           <div className="notice small">
             <strong>Source definition</strong>
             <div>{value.source_definition || "No source definition"}</div>
@@ -733,6 +839,15 @@ function ValueProfile({
             Save definition revision
           </button>
         </form>
+        <button
+          className="btn btn-danger"
+          style={{ marginTop: 8 }}
+          onClick={() =>
+            mutate(() => repo.setValueActive(value.id, !value.active))
+          }
+        >
+          {value.active ? "Archive value" : "Restore value"}
+        </button>
       </Panel>
       <Panel title="Structured evidence">
         <Evidence
@@ -848,6 +963,7 @@ const Evidence = ({
 function Compare({ repo, db, mutate }: ViewProps) {
   const sets = repo.sets();
   const contexts = repo.contexts();
+  const settings = repo.settings();
   const sessions = repo.sessions();
   const activeSession = sessions.find((item) => item.status === "active");
   const [sessionId, setSessionId] = useState(activeSession?.id ?? "");
@@ -861,6 +977,7 @@ function Compare({ repo, db, mutate }: ViewProps) {
   const queue = session ? repo.queue(session.id) : [];
   const pair = queue[0];
   const values = session ? repo.values(session.value_set_id) : [];
+  const currentRatings = session ? repo.ratings(session.value_set_id) : [];
   const left = values.find((value) => value.id === pair?.left_value_id);
   const right = values.find((value) => value.id === pair?.right_value_id);
   const [notes, setNotes] = useState(false);
@@ -1021,9 +1138,12 @@ function Compare({ repo, db, mutate }: ViewProps) {
       session.id,
     ])
     .map((row) => row.context_id);
+  const priorEvents = repo.history(session.value_set_id).slice(0, 8);
   const sessionActions = (
     <div className="row">
-      <span className="badge">{session.completed_count} done · {queue.length} left</span>
+      <span className="badge">
+        {session.completed_count} done · {queue.length} left
+      </span>
       <button className="btn" type="button" onClick={() => setCreating(true)}>
         <Plus size={14} /> New session
       </button>
@@ -1072,6 +1192,14 @@ function Compare({ repo, db, mutate }: ViewProps) {
               result,
               strength: String(data.get("strength")) as Strength,
               confidence: String(data.get("confidence")) as Confidence,
+              consideration: String(
+                data.get("consideration") || "intrinsic",
+              ) as "intrinsic" | "obligation" | "instrumental" | "uncertainty",
+              tags: String(data.get("tags") ?? "")
+                .split(",")
+                .map((item) => item.trim())
+                .filter(Boolean),
+              relatedEventIds: data.getAll("relatedEvents").map(String),
               contexts: data.getAll("contexts").map(String),
               reasoning: String(data.get("reasoning") ?? ""),
               winner: String(data.get("winner") ?? ""),
@@ -1089,6 +1217,18 @@ function Compare({ repo, db, mutate }: ViewProps) {
                   <span className="badge">
                     {value.parent_category || value.source_taxonomy}
                   </span>
+                  {settings.display.showRatingsDuringComparison && (
+                    <span className="badge" style={{ marginLeft: 6 }}>
+                      Rank{" "}
+                      {currentRatings.findIndex(
+                        (rating) => rating.value_id === value.id,
+                      ) + 1}{" "}
+                      · σ{" "}
+                      {currentRatings
+                        .find((rating) => rating.value_id === value.id)
+                        ?.sigma.toFixed(2)}
+                    </span>
+                  )}
                   <h2>{value.name}</h2>
                   <p>{value.personal_definition || value.short_definition}</p>
                 </div>
@@ -1208,6 +1348,37 @@ function Compare({ repo, db, mutate }: ViewProps) {
               <Field label="What would reverse the decision">
                 <textarea className="textarea" name="reversal" />
               </Field>
+              <Field label="Decision basis">
+                <select className="select" name="consideration">
+                  <option value="intrinsic">Intrinsic preference</option>
+                  <option value="obligation">Obligation</option>
+                  <option value="instrumental">Instrumental</option>
+                  <option value="uncertainty">Uncertainty</option>
+                </select>
+              </Field>
+              <Field label="Tags">
+                <input
+                  className="input"
+                  name="tags"
+                  placeholder="Comma separated"
+                />
+              </Field>
+              {priorEvents.length > 0 && (
+                <div className="field">
+                  <span>Related comparisons</span>
+                  {priorEvents.map((item) => (
+                    <label className="check-row small" key={item.id}>
+                      <input
+                        type="checkbox"
+                        name="relatedEvents"
+                        value={item.id}
+                      />{" "}
+                      {item.left_name} vs {item.right_name} [
+                      {item.id.slice(0, 8)}]
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </Panel>
@@ -2135,6 +2306,45 @@ function ManualTierBrowser({
                 ]),
               );
             });
+            const inferred = db
+              .query<{
+                value_id: string;
+              }>("SELECT value_id FROM ratings WHERE value_set_id=? AND scope_key='global' ORDER BY mu DESC", [setId])
+              .map((row) => row.value_id);
+            const manual = tiers.slice(0, -1).flatMap((tier) => tier.ids);
+            manual.forEach((valueId, manualRank) => {
+              const inferredRank = inferred.indexOf(valueId);
+              if (
+                inferredRank < 0 ||
+                Math.abs(inferredRank - manualRank) <
+                  Math.max(4, Math.floor(values.length * 0.25))
+              )
+                return;
+              const signature = `manual-tier:${valueId}`;
+              if (
+                db.one("SELECT id FROM tensions WHERE detection_type=?", [
+                  signature,
+                ])
+              )
+                return;
+              const tensionId = uid();
+              const stamp = Date.now();
+              db.run("INSERT INTO tensions VALUES (?,?,?,?,?,?,?,?,?)", [
+                tensionId,
+                "Manual tier differs from inferred rank",
+                "The user's manual placement is materially different from the posterior ordering.",
+                "medium",
+                "suggested",
+                signature,
+                "",
+                stamp,
+                stamp,
+              ]);
+              db.run("INSERT INTO tension_values VALUES (?,?)", [
+                tensionId,
+                valueId,
+              ]);
+            });
           })
         }
       >
@@ -2818,7 +3028,9 @@ function ImportSet({
 
 function SettingsView({ repo, db, mutate }: ViewProps) {
   const settings = repo.settings();
-  const contexts = repo.contexts();
+  const contexts = db.query<ContextRow>(
+    "SELECT id,name,description,archived FROM contexts ORDER BY name",
+  );
   return (
     <Page
       title="Settings"
@@ -2854,6 +3066,22 @@ function SettingsView({ repo, db, mutate }: ViewProps) {
                 retestFrequency: Number(data.get("retest")),
                 tiersSufficient: Boolean(data.get("tiers")),
               };
+              const selection = {
+                ...settings.selection,
+                uncertainty: Number(data.get("weightUncertainty")),
+                similarity: Number(data.get("weightSimilarity")),
+                topFocus: Number(data.get("weightTop")),
+                boundary: Number(data.get("weightBoundary")),
+                coverage: Number(data.get("weightCoverage")),
+                retest: Number(data.get("weightRetest")),
+                crossCategory: Number(data.get("weightCategory")),
+                contradiction: Number(data.get("weightContradiction")),
+                contextDisagreement: Number(data.get("weightContext")),
+              };
+              const display = {
+                ...settings.display,
+                showRatingsDuringComparison: Boolean(data.get("showRatings")),
+              };
               mutate(async () => {
                 await db.transaction(() => {
                   db.run(
@@ -2863,6 +3091,14 @@ function SettingsView({ repo, db, mutate }: ViewProps) {
                   db.run(
                     "UPDATE application_settings SET value=?,updated_at=? WHERE key='convergence'",
                     [JSON.stringify(convergence), Date.now()],
+                  );
+                  db.run(
+                    "UPDATE application_settings SET value=?,updated_at=? WHERE key='selection'",
+                    [JSON.stringify(selection), Date.now()],
+                  );
+                  db.run(
+                    "UPDATE application_settings SET value=?,updated_at=? WHERE key='display'",
+                    [JSON.stringify(display), Date.now()],
                   );
                 });
                 for (const set of repo.sets()) await repo.recompute(set.id);
@@ -2918,6 +3154,56 @@ function SettingsView({ repo, db, mutate }: ViewProps) {
                 value={settings.convergence.retestFrequency}
               />
             </div>
+            <details>
+              <summary>Adaptive selection weights</summary>
+              <div className="form-grid" style={{ marginTop: 10 }}>
+                <Num
+                  name="weightUncertainty"
+                  label="Uncertainty"
+                  value={settings.selection.uncertainty}
+                />
+                <Num
+                  name="weightSimilarity"
+                  label="Similarity"
+                  value={settings.selection.similarity}
+                />
+                <Num
+                  name="weightTop"
+                  label="Top focus"
+                  value={settings.selection.topFocus}
+                />
+                <Num
+                  name="weightBoundary"
+                  label="Top-k boundary"
+                  value={settings.selection.boundary}
+                />
+                <Num
+                  name="weightCoverage"
+                  label="Coverage"
+                  value={settings.selection.coverage}
+                />
+                <Num
+                  name="weightRetest"
+                  label="Retest"
+                  value={settings.selection.retest}
+                />
+                <Num
+                  name="weightCategory"
+                  label="Cross-category"
+                  value={settings.selection.crossCategory}
+                />
+                <Num
+                  name="weightContradiction"
+                  label="Contradiction"
+                  value={settings.selection.contradiction}
+                />
+                <Num
+                  name="weightContext"
+                  label="Context disagreement"
+                  value={settings.selection.contextDisagreement}
+                />
+              </div>
+            </details>
             <label className="check-row">
               <input
                 type="checkbox"
@@ -2934,6 +3220,14 @@ function SettingsView({ repo, db, mutate }: ViewProps) {
                 defaultChecked={settings.convergence.tiersSufficient}
               />{" "}
               Stable tiers are sufficient
+            </label>
+            <label className="check-row">
+              <input
+                type="checkbox"
+                name="showRatings"
+                defaultChecked={settings.display.showRatingsDuringComparison}
+              />{" "}
+              Show current ratings during comparison
             </label>
             <div className="row">
               <button className="btn btn-primary">Save and replay</button>
@@ -2978,10 +3272,11 @@ function SettingsView({ repo, db, mutate }: ViewProps) {
                     mutate(() =>
                       db.transaction(() =>
                         db.run(
-                          "UPDATE contexts SET name=?,description=?,updated_at=? WHERE id=?",
+                          "UPDATE contexts SET name=?,description=?,archived=?,updated_at=? WHERE id=?",
                           [
                             data.get("name"),
                             data.get("description"),
+                            data.get("archived") ? 1 : 0,
                             Date.now(),
                             context.id,
                           ],
@@ -3001,6 +3296,14 @@ function SettingsView({ repo, db, mutate }: ViewProps) {
                     defaultValue={context.description}
                   />
                   <button className="btn btn-sm">Save</button>
+                  <label className="check-row small">
+                    <input
+                      type="checkbox"
+                      name="archived"
+                      defaultChecked={Boolean(context.archived)}
+                    />{" "}
+                    Archived
+                  </label>
                 </form>
               ))}
             </div>
