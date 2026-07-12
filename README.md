@@ -133,9 +133,10 @@ Configure the generator in
 
 - **On-device:** always available; composes a decision frame from the current value
   definitions and context without a network request.
-- **OpenRouter Free:** uses the existing OpenRouter key with
-  `deepseek/deepseek-v4-flash:free`, falling back to `openrouter/free`. No DeepSeek key is
-  involved. Free endpoints remain subject to availability and rate limits.
+- **OpenRouter Free:** uses the maintained `openrouter/free` router with the existing
+  OpenRouter key. Older saved `deepseek/deepseek-v4-flash:free` configurations are
+  migrated automatically because that free model ID is no longer listed. No DeepSeek
+  key is involved. Free endpoints remain subject to availability and rate limits.
 - **DeepSeek V4 Flash:** uses the OpenAI-compatible DeepSeek API and defaults to
   `deepseek-v4-flash`.
 

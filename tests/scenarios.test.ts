@@ -69,7 +69,7 @@ describe("definition-derived scenarios", () => {
       anchor: "the Sunday project",
       choices: [
         { id: "A", action: "Decline the Sunday project and keep the commitment." },
-        { id: "B", action: "Accept the Sunday project and arrange substitute coverage." },
+        { id: "B", action: "Accept this Sunday project and arrange substitute coverage." },
       ],
     }))).toBe(true);
   });

@@ -172,6 +172,7 @@ function contentText(content: unknown): string {
   if (typeof content === "string") return content;
   if (Array.isArray(content)) return content.map(contentText).filter(Boolean).join("");
   if (!content || typeof content !== "object") return "";
+  if ("scenario" in content || "choices" in content) return JSON.stringify(content);
   const part = content as { text?: unknown; content?: unknown };
   if (typeof part.text === "string") return part.text;
   return contentText(part.content);
@@ -247,13 +248,26 @@ export function scenarioHasSharedAnchor(content: unknown): boolean {
       choices?: unknown;
     };
     const anchor = clean(contentText(parsed.anchor)).toLocaleLowerCase();
-    const scenario = clean(contentText(parsed.scenario)).toLocaleLowerCase();
-    if (!anchor || anchor.split(" ").length < 2 || !scenario.includes(anchor)) return false;
+    const anchorTokens = anchor
+      .replace(/[^a-z0-9]+/g, " ")
+      .split(" ")
+      .filter((token) => token.length > 2 && !["the", "this", "that"].includes(token));
+    const containsAnchor = (value: unknown) => {
+      const tokens = new Set(
+        clean(contentText(value))
+          .toLocaleLowerCase()
+          .replace(/[^a-z0-9]+/g, " ")
+          .split(" ")
+          .filter(Boolean),
+      );
+      return anchorTokens.length > 0 && anchorTokens.every((token) => tokens.has(token));
+    };
+    if (!anchor || !containsAnchor(parsed.scenario)) return false;
     if (!Array.isArray(parsed.choices) || !parsed.choices.length) return false;
     return parsed.choices.every((choice) => {
       if (!choice || typeof choice !== "object") return false;
       const item = choice as { action?: unknown; text?: unknown };
-      return clean(contentText(item.action ?? item.text)).toLocaleLowerCase().includes(anchor);
+      return containsAnchor(item.action ?? item.text);
     });
   } catch {
     return false;
@@ -280,10 +294,11 @@ export class OpenAICompatibleScenarioProvider implements ScenarioProvider {
       ? "https://openrouter.ai/api/v1/chat/completions"
       : "https://api.deepseek.com/chat/completions";
     const configuredModel = this.config.model?.trim();
-    const useFastFreeRoute =
-      openRouter && (!configuredModel || configuredModel === "openrouter/free");
-    const model = useFastFreeRoute
-      ? "deepseek/deepseek-v4-flash:free"
+    const obsoleteFreeModel = configuredModel === "deepseek/deepseek-v4-flash:free";
+    const model = openRouter
+      ? !configuredModel || obsoleteFreeModel
+        ? "openrouter/free"
+        : configuredModel
       : configuredModel || "deepseek-v4-flash";
     const response = await fetch(endpoint, {
       method: "POST",
@@ -299,9 +314,7 @@ export class OpenAICompatibleScenarioProvider implements ScenarioProvider {
           : {}),
       },
       body: JSON.stringify({
-        ...(useFastFreeRoute
-          ? { models: [model, "openrouter/free"] }
-          : { model }),
+        model,
         messages: [
           { role: "system", content: "You design tightly controlled factorial-survey vignettes. All portraits must respond to the same stated facts; never splice together separate scenarios." },
           { role: "user", content: scenarioPrompt(request) },

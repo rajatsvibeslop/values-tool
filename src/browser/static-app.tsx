@@ -267,11 +267,20 @@ type ScenarioConfig = {
   apiKey: string;
 };
 
-const scenarioConfig = (): ScenarioConfig => ({
-  provider: (localStorage.getItem("scenario-provider") as ScenarioConfig["provider"]) || "local",
-  model: localStorage.getItem("scenario-model") || "",
-  apiKey: sessionStorage.getItem("scenario-api-key") || "",
-});
+const scenarioConfig = (): ScenarioConfig => {
+  const provider =
+    (localStorage.getItem("scenario-provider") as ScenarioConfig["provider"]) || "local";
+  const storedModel = localStorage.getItem("scenario-model") || "";
+  return {
+    provider,
+    model:
+      provider === "openrouter" &&
+      (!storedModel || storedModel === "deepseek/deepseek-v4-flash:free")
+        ? "openrouter/free"
+        : storedModel,
+    apiKey: sessionStorage.getItem("scenario-api-key") || "",
+  };
+};
 const scenarioGenerationInFlight = new Map<string, Promise<GeneratedScenario>>();
 const delay = (milliseconds: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
@@ -4283,11 +4292,12 @@ function ScenarioSettings() {
             </Field>
             <Field label="Model">
               <input
+                key={provider}
                 className="input"
                 name="model"
                 defaultValue={
                   initial.model ||
-                  (provider === "openrouter" ? "deepseek/deepseek-v4-flash:free" : "deepseek-v4-flash")
+                  (provider === "openrouter" ? "openrouter/free" : "deepseek-v4-flash")
                 }
               />
             </Field>

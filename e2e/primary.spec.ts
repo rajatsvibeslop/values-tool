@@ -170,16 +170,13 @@ test("stores hosted scenario credentials only for the browser tab", async ({ pag
     scenarioRequests += 1;
     const body = route.request().postDataJSON() as {
       max_tokens: number;
-      models: string[];
+      model: string;
       response_format: { type: string; json_schema: { strict: boolean } };
       plugins: { id: string }[];
       provider: { require_parameters: boolean; sort: string };
     };
     expect(body.max_tokens).toBe(600);
-    expect(body.models).toEqual([
-      "deepseek/deepseek-v4-flash:free",
-      "openrouter/free",
-    ]);
+    expect(body.model).toBe("openrouter/free");
     expect(body.response_format.type).toBe("json_schema");
     expect(body.response_format.json_schema.strict).toBe(true);
     expect(body.plugins).toEqual([{ id: "response-healing" }]);
