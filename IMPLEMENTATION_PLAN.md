@@ -24,6 +24,10 @@
 - [x] Settings, dark mode, responsive navigation, empty/error states, and accessibility
 - [x] Unit, integration, and Playwright end-to-end tests
 - [x] Lint, strict typecheck, tests, production builds, README, and schema diagram
+- [x] Finite exact-order sessions with deterministic progress and targeted-retest diagnostics
+- [x] Broad 100 and public-domain Miller card-sort presets
+- [x] Tier-first ranking/report views with interval plots and relation matrices
+- [x] Committed Swiss instrument visual system and bundled typography
 
 ## Key Decisions
 
@@ -42,6 +46,14 @@
    interface with no configured provider; generated output remains a draft.
 6. **Preset licensing:** Presets contain short descriptive paraphrases and bibliographic
    metadata, not proprietary prompt or scoring text.
+7. **Exact ordering:** A stable, transitive preference is scheduled with deterministic
+   binary insertion. For 100 distinct values this needs at most 573 decisive answers,
+   close to the 525-comparison information lower bound. Existing consistent evidence is
+   reused. TrueSkill remains the uncertainty model and drives focused verification once
+   an ordering exists.
+8. **Unresolved relations:** Ties remain tier relations; incomparable, skipped, and
+   malformed answers do not become wins or draws. Exact-order progress is explicitly
+   separated from Bayesian convergence.
 
 ## Verification Gates
 

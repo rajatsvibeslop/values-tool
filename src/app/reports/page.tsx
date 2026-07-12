@@ -69,7 +69,7 @@ export default async function ReportsPage({
       <article className="panel panel-body">
         <h1>{set.name}</h1>
         <p className="small muted">
-          Generated {new Date().toLocaleString()} · schema 1
+          Generated {new Date().toLocaleString()}
         </p>
         <h2>Methodology</h2>
         <p>

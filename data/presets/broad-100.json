@@ -1,0 +1,610 @@
+{
+  "slug": "broad-100",
+  "name": "Broad 100 personal values",
+  "description": "An original, editable 100-value vocabulary spanning agency, relationships, ethics, growth, purpose, wellbeing, exploration, work, society, and stability.",
+  "citation": "Values Tool original broad values catalog (2026), informed by common non-proprietary values vocabularies.",
+  "licenseNote": "Original catalog released with the application under the MIT License; not a reproduction of a proprietary card sort.",
+  "taxonomy": "Values Tool Broad 100",
+  "values": [
+    {
+      "id": "autonomy",
+      "name": "Autonomy",
+      "definition": "Directing my own choices and life",
+      "category": "Agency"
+    },
+    {
+      "id": "freedom",
+      "name": "Freedom",
+      "definition": "Having meaningful room to choose and act",
+      "category": "Agency"
+    },
+    {
+      "id": "independence",
+      "name": "Independence",
+      "definition": "Relying on my own judgment and capacity",
+      "category": "Agency"
+    },
+    {
+      "id": "courage",
+      "name": "Courage",
+      "definition": "Acting despite fear or meaningful risk",
+      "category": "Agency"
+    },
+    {
+      "id": "initiative",
+      "name": "Initiative",
+      "definition": "Starting useful action without waiting",
+      "category": "Agency"
+    },
+    {
+      "id": "self-respect",
+      "name": "Self-respect",
+      "definition": "Treating my own dignity as non-negotiable",
+      "category": "Agency"
+    },
+    {
+      "id": "authenticity",
+      "name": "Authenticity",
+      "definition": "Living consistently with what I genuinely believe",
+      "category": "Agency"
+    },
+    {
+      "id": "discipline",
+      "name": "Discipline",
+      "definition": "Following through despite distraction or discomfort",
+      "category": "Agency"
+    },
+    {
+      "id": "resilience",
+      "name": "Resilience",
+      "definition": "Recovering and adapting after difficulty",
+      "category": "Agency"
+    },
+    {
+      "id": "self-knowledge",
+      "name": "Self-knowledge",
+      "definition": "Understanding my motives, patterns, and limits",
+      "category": "Agency"
+    },
+    {
+      "id": "belonging",
+      "name": "Belonging",
+      "definition": "Feeling accepted within a group or place",
+      "category": "Connection"
+    },
+    {
+      "id": "family",
+      "name": "Family",
+      "definition": "Sustaining loving and dependable family bonds",
+      "category": "Connection"
+    },
+    {
+      "id": "friendship",
+      "name": "Friendship",
+      "definition": "Building close and mutually supportive friendships",
+      "category": "Connection"
+    },
+    {
+      "id": "intimacy",
+      "name": "Intimacy",
+      "definition": "Sharing inner experience with trusted people",
+      "category": "Connection"
+    },
+    {
+      "id": "love",
+      "name": "Love",
+      "definition": "Giving and receiving deep care",
+      "category": "Connection"
+    },
+    {
+      "id": "loyalty",
+      "name": "Loyalty",
+      "definition": "Remaining faithful to people and commitments",
+      "category": "Connection"
+    },
+    {
+      "id": "trust",
+      "name": "Trust",
+      "definition": "Being reliable and able to rely on others",
+      "category": "Connection"
+    },
+    {
+      "id": "compassion",
+      "name": "Compassion",
+      "definition": "Responding to suffering with concern and action",
+      "category": "Connection"
+    },
+    {
+      "id": "empathy",
+      "name": "Empathy",
+      "definition": "Understanding another person's experience",
+      "category": "Connection"
+    },
+    {
+      "id": "community",
+      "name": "Community",
+      "definition": "Participating in reciprocal life with others",
+      "category": "Connection"
+    },
+    {
+      "id": "honesty",
+      "name": "Honesty",
+      "definition": "Representing reality and intentions truthfully",
+      "category": "Ethics"
+    },
+    {
+      "id": "integrity",
+      "name": "Integrity",
+      "definition": "Keeping actions consistent with stated principles",
+      "category": "Ethics"
+    },
+    {
+      "id": "justice",
+      "name": "Justice",
+      "definition": "Supporting fair treatment and institutions",
+      "category": "Ethics"
+    },
+    {
+      "id": "fairness",
+      "name": "Fairness",
+      "definition": "Applying standards without improper favoritism",
+      "category": "Ethics"
+    },
+    {
+      "id": "responsibility",
+      "name": "Responsibility",
+      "definition": "Owning commitments, choices, and consequences",
+      "category": "Ethics"
+    },
+    {
+      "id": "accountability",
+      "name": "Accountability",
+      "definition": "Answering candidly for results and repairing harm",
+      "category": "Ethics"
+    },
+    {
+      "id": "respect",
+      "name": "Respect",
+      "definition": "Recognizing the dignity and boundaries of others",
+      "category": "Ethics"
+    },
+    {
+      "id": "humility",
+      "name": "Humility",
+      "definition": "Holding an accurate, uninflated view of oneself",
+      "category": "Ethics"
+    },
+    {
+      "id": "forgiveness",
+      "name": "Forgiveness",
+      "definition": "Releasing resentment while retaining discernment",
+      "category": "Ethics"
+    },
+    {
+      "id": "virtue",
+      "name": "Virtue",
+      "definition": "Cultivating morally excellent character",
+      "category": "Ethics"
+    },
+    {
+      "id": "curiosity",
+      "name": "Curiosity",
+      "definition": "Seeking new understanding and experience",
+      "category": "Growth"
+    },
+    {
+      "id": "learning",
+      "name": "Learning",
+      "definition": "Increasing knowledge through study and reflection",
+      "category": "Growth"
+    },
+    {
+      "id": "mastery",
+      "name": "Mastery",
+      "definition": "Developing excellent skill through sustained practice",
+      "category": "Growth"
+    },
+    {
+      "id": "wisdom",
+      "name": "Wisdom",
+      "definition": "Using sound judgment informed by experience",
+      "category": "Growth"
+    },
+    {
+      "id": "creativity",
+      "name": "Creativity",
+      "definition": "Producing original and useful ideas or forms",
+      "category": "Growth"
+    },
+    {
+      "id": "open-mindedness",
+      "name": "Open-mindedness",
+      "definition": "Revising beliefs when evidence warrants",
+      "category": "Growth"
+    },
+    {
+      "id": "challenge",
+      "name": "Challenge",
+      "definition": "Choosing demanding work that develops capacity",
+      "category": "Growth"
+    },
+    {
+      "id": "excellence",
+      "name": "Excellence",
+      "definition": "Pursuing unusually high standards",
+      "category": "Growth"
+    },
+    {
+      "id": "achievement",
+      "name": "Achievement",
+      "definition": "Completing work that matters",
+      "category": "Growth"
+    },
+    {
+      "id": "growth",
+      "name": "Growth",
+      "definition": "Continuing to develop capacity and maturity",
+      "category": "Growth"
+    },
+    {
+      "id": "meaning",
+      "name": "Meaning",
+      "definition": "Connecting life to purposes experienced as significant",
+      "category": "Purpose"
+    },
+    {
+      "id": "purpose",
+      "name": "Purpose",
+      "definition": "Maintaining direction around what matters most",
+      "category": "Purpose"
+    },
+    {
+      "id": "contribution",
+      "name": "Contribution",
+      "definition": "Leaving people or systems better through my effort",
+      "category": "Purpose"
+    },
+    {
+      "id": "service",
+      "name": "Service",
+      "definition": "Using my abilities for others or a larger cause",
+      "category": "Purpose"
+    },
+    {
+      "id": "stewardship",
+      "name": "Stewardship",
+      "definition": "Caring for shared resources and future needs",
+      "category": "Purpose"
+    },
+    {
+      "id": "legacy",
+      "name": "Legacy",
+      "definition": "Creating benefits that endure beyond me",
+      "category": "Purpose"
+    },
+    {
+      "id": "faith",
+      "name": "Faith",
+      "definition": "Orienting life through religious or spiritual conviction",
+      "category": "Purpose"
+    },
+    {
+      "id": "spirituality",
+      "name": "Spirituality",
+      "definition": "Developing connection to the sacred or transcendent",
+      "category": "Purpose"
+    },
+    {
+      "id": "devotion",
+      "name": "Devotion",
+      "definition": "Giving sustained commitment to a person, practice, or cause",
+      "category": "Purpose"
+    },
+    {
+      "id": "hope",
+      "name": "Hope",
+      "definition": "Sustaining possibility and constructive expectation",
+      "category": "Purpose"
+    },
+    {
+      "id": "health",
+      "name": "Health",
+      "definition": "Supporting physical and mental functioning",
+      "category": "Wellbeing"
+    },
+    {
+      "id": "vitality",
+      "name": "Vitality",
+      "definition": "Living with energy and aliveness",
+      "category": "Wellbeing"
+    },
+    {
+      "id": "peace",
+      "name": "Peace",
+      "definition": "Reducing destructive conflict within and around me",
+      "category": "Wellbeing"
+    },
+    {
+      "id": "balance",
+      "name": "Balance",
+      "definition": "Allocating attention without chronic distortion",
+      "category": "Wellbeing"
+    },
+    {
+      "id": "rest",
+      "name": "Rest",
+      "definition": "Protecting time for recovery and renewal",
+      "category": "Wellbeing"
+    },
+    {
+      "id": "pleasure",
+      "name": "Pleasure",
+      "definition": "Making room for enjoyable experience",
+      "category": "Wellbeing"
+    },
+    {
+      "id": "joy",
+      "name": "Joy",
+      "definition": "Welcoming delight and deep gladness",
+      "category": "Wellbeing"
+    },
+    {
+      "id": "play",
+      "name": "Play",
+      "definition": "Engaging in freely chosen, absorbing activity",
+      "category": "Wellbeing"
+    },
+    {
+      "id": "comfort",
+      "name": "Comfort",
+      "definition": "Maintaining reasonable ease and relief from distress",
+      "category": "Wellbeing"
+    },
+    {
+      "id": "safety",
+      "name": "Safety",
+      "definition": "Protecting people from avoidable harm",
+      "category": "Wellbeing"
+    },
+    {
+      "id": "adventure",
+      "name": "Adventure",
+      "definition": "Seeking novel and stretching experience",
+      "category": "Exploration"
+    },
+    {
+      "id": "wonder",
+      "name": "Wonder",
+      "definition": "Remaining receptive to awe and mystery",
+      "category": "Exploration"
+    },
+    {
+      "id": "discovery",
+      "name": "Discovery",
+      "definition": "Finding what was previously unknown",
+      "category": "Exploration"
+    },
+    {
+      "id": "variety",
+      "name": "Variety",
+      "definition": "Including meaningful change and difference",
+      "category": "Exploration"
+    },
+    {
+      "id": "spontaneity",
+      "name": "Spontaneity",
+      "definition": "Leaving room for unplanned action",
+      "category": "Exploration"
+    },
+    {
+      "id": "risk",
+      "name": "Risk",
+      "definition": "Accepting uncertainty for a worthwhile possibility",
+      "category": "Exploration"
+    },
+    {
+      "id": "experimentation",
+      "name": "Experimentation",
+      "definition": "Learning by trying and observing",
+      "category": "Exploration"
+    },
+    {
+      "id": "imagination",
+      "name": "Imagination",
+      "definition": "Forming possibilities beyond present conditions",
+      "category": "Exploration"
+    },
+    {
+      "id": "beauty",
+      "name": "Beauty",
+      "definition": "Appreciating compelling form, harmony, and expression",
+      "category": "Exploration"
+    },
+    {
+      "id": "nature",
+      "name": "Nature",
+      "definition": "Maintaining attentive connection with the living world",
+      "category": "Exploration"
+    },
+    {
+      "id": "competence",
+      "name": "Competence",
+      "definition": "Being capable in the tasks I undertake",
+      "category": "Craft & Work"
+    },
+    {
+      "id": "diligence",
+      "name": "Diligence",
+      "definition": "Applying sustained and careful effort",
+      "category": "Craft & Work"
+    },
+    {
+      "id": "precision",
+      "name": "Precision",
+      "definition": "Attending closely to correctness and detail",
+      "category": "Craft & Work"
+    },
+    {
+      "id": "reliability",
+      "name": "Reliability",
+      "definition": "Doing what others can reasonably expect",
+      "category": "Craft & Work"
+    },
+    {
+      "id": "practicality",
+      "name": "Practicality",
+      "definition": "Favoring workable responses to real constraints",
+      "category": "Craft & Work"
+    },
+    {
+      "id": "productivity",
+      "name": "Productivity",
+      "definition": "Turning effort into valuable results",
+      "category": "Craft & Work"
+    },
+    {
+      "id": "innovation",
+      "name": "Innovation",
+      "definition": "Putting novel ideas into effective practice",
+      "category": "Craft & Work"
+    },
+    {
+      "id": "leadership",
+      "name": "Leadership",
+      "definition": "Helping a group choose direction and act well",
+      "category": "Craft & Work"
+    },
+    {
+      "id": "collaboration",
+      "name": "Collaboration",
+      "definition": "Working jointly toward shared outcomes",
+      "category": "Craft & Work"
+    },
+    {
+      "id": "quality",
+      "name": "Quality",
+      "definition": "Making things that hold up under serious use",
+      "category": "Craft & Work"
+    },
+    {
+      "id": "equality",
+      "name": "Equality",
+      "definition": "Supporting equal standing and opportunity",
+      "category": "Society"
+    },
+    {
+      "id": "liberty",
+      "name": "Liberty",
+      "definition": "Protecting freedom from unjust control",
+      "category": "Society"
+    },
+    {
+      "id": "democracy",
+      "name": "Democracy",
+      "definition": "Sharing public power through accountable participation",
+      "category": "Society"
+    },
+    {
+      "id": "tolerance",
+      "name": "Tolerance",
+      "definition": "Respecting people across meaningful difference",
+      "category": "Society"
+    },
+    {
+      "id": "pluralism",
+      "name": "Pluralism",
+      "definition": "Making room for multiple ways of living",
+      "category": "Society"
+    },
+    {
+      "id": "civic-duty",
+      "name": "Civic duty",
+      "definition": "Contributing to functioning public life",
+      "category": "Society"
+    },
+    {
+      "id": "sustainability",
+      "name": "Sustainability",
+      "definition": "Meeting needs without undermining future life",
+      "category": "Society"
+    },
+    {
+      "id": "peacebuilding",
+      "name": "Peacebuilding",
+      "definition": "Transforming conflict without destructive force",
+      "category": "Society"
+    },
+    {
+      "id": "solidarity",
+      "name": "Solidarity",
+      "definition": "Standing with others around shared needs or injustice",
+      "category": "Society"
+    },
+    {
+      "id": "tradition",
+      "name": "Tradition",
+      "definition": "Sustaining inherited practices that carry meaning",
+      "category": "Society"
+    },
+    {
+      "id": "security",
+      "name": "Security",
+      "definition": "Maintaining dependable foundations and protection",
+      "category": "Stability & Status"
+    },
+    {
+      "id": "stability",
+      "name": "Stability",
+      "definition": "Preserving useful continuity over time",
+      "category": "Stability & Status"
+    },
+    {
+      "id": "order",
+      "name": "Order",
+      "definition": "Keeping life and systems coherent and organized",
+      "category": "Stability & Status"
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Applying standards and effort predictably",
+      "category": "Stability & Status"
+    },
+    {
+      "id": "preparedness",
+      "name": "Preparedness",
+      "definition": "Anticipating needs and reducing preventable risk",
+      "category": "Stability & Status"
+    },
+    {
+      "id": "prosperity",
+      "name": "Prosperity",
+      "definition": "Having sufficient resources for a flourishing life",
+      "category": "Stability & Status"
+    },
+    {
+      "id": "wealth",
+      "name": "Wealth",
+      "definition": "Accumulating substantial financial resources",
+      "category": "Stability & Status"
+    },
+    {
+      "id": "recognition",
+      "name": "Recognition",
+      "definition": "Having meaningful work and qualities acknowledged",
+      "category": "Stability & Status"
+    },
+    {
+      "id": "influence",
+      "name": "Influence",
+      "definition": "Shaping decisions and conditions beyond myself",
+      "category": "Stability & Status"
+    },
+    {
+      "id": "authority",
+      "name": "Authority",
+      "definition": "Holding legitimate power and responsibility",
+      "category": "Stability & Status"
+    }
+  ]
+}

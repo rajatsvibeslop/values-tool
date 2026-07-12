@@ -29,7 +29,7 @@ export default function DashboardPage() {
   return <div className="page">
     <PageHeader title="Dashboard" description={`${data.selected.name} · global evidence across ${values.length} active values`} actions={activeSession ? <Link className="btn btn-primary" href={`/compare?session=${activeSession.id}`}><Play size={16} /> Resume session</Link> : <Link className="btn btn-primary" href="/compare"><Plus size={16} /> New session</Link>} />
     <div className="grid metrics">
-      <Metric label="Comparisons" value={data.comparisons} detail="Effective source events" />
+      <Metric label="Comparisons" value={data.comparisons} detail="Recorded decisions" />
       <Metric label="Evidence gaps" value={diagnostics.insufficientValues} detail={`Below ${settings.convergence.minimumComparisons} comparisons`} />
       <Metric label="Near-ties" value={diagnostics.unresolvedNearTies} detail="Overlapping adjacent estimates" />
       <Metric label="Suspected tensions" value={data.tensions.filter((item) => item.status === "suggested").length} detail={`${disagreements} context rank disagreements`} />

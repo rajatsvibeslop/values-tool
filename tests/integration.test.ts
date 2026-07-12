@@ -25,10 +25,36 @@ beforeEach(async () => {
 describe("browser repository integration", () => {
   it("imports a preset, starts a session, compares, pauses, and resumes", async () => {
     const setId = await repo.importPreset("editable-card-sort"); expect(repo.values(setId)).toHaveLength(20); expect(repo.ratings(setId)).toHaveLength(20);
-    const sessionId = await repo.startSession(setId, "Primary journey", ["general-life"]); expect(repo.queue(sessionId).length).toBeGreaterThan(5); const first = repo.queue(sessionId)[0]!;
+    const sessionId = await repo.startSession(setId, "Primary journey", ["general-life"]); expect(repo.queue(sessionId)).toHaveLength(1); const first = repo.queue(sessionId)[0]!;
     await repo.submit({ sessionId, setId, leftId: first.left_value_id, rightId: first.right_value_id, result: "left", strength: "moderate", confidence: "confident", contexts: ["general-life"], reasoning: "The left value is more fundamental here.", winner: "It protects the central goal.", loser: "It still protects continuity.", reversal: "A safety emergency could reverse this." });
     expect(repo.history(setId)).toHaveLength(1); expect(repo.ratings(setId).find((rating) => rating.value_id === first.left_value_id)!.wins).toBe(1); expect(database.query("SELECT * FROM comparison_notes")).toHaveLength(4); expect(database.query("SELECT * FROM rating_snapshots")).toHaveLength(3);
     await database.transaction(() => database.run("UPDATE comparison_sessions SET status='paused' WHERE id=?", [sessionId])); expect(repo.sessions()[0]!.status).toBe("paused"); await database.transaction(() => database.run("UPDATE comparison_sessions SET status='active' WHERE id=?", [sessionId])); expect(repo.sessions()[0]!.status).toBe("active");
+  });
+
+  it("finishes an exact-order session instead of replenishing the queue", async () => {
+    const setId = await repo.createSet("Small order");
+    for (const name of ["Alpha", "Beta", "Gamma", "Delta"])
+      await repo.addValue(setId, { name, definition: name });
+    const sessionId = await repo.startSession(setId, "Finite ordering", []);
+    let guard = 0;
+    while (repo.queue(sessionId).length) {
+      expect(repo.queue(sessionId)).toHaveLength(1);
+      const pair = repo.queue(sessionId)[0]!;
+      const values = repo.values(setId);
+      const left = values.find((value) => value.id === pair.left_value_id)!;
+      const right = values.find((value) => value.id === pair.right_value_id)!;
+      await repo.submit({
+        sessionId, setId, leftId: left.id, rightId: right.id,
+        result: left.name < right.name ? "left" : "right",
+        strength: "moderate", confidence: "confident", contexts: [],
+        reasoning: "", winner: "", loser: "", reversal: "",
+      });
+      expect(++guard).toBeLessThanOrEqual(5);
+    }
+    expect(repo.sessions().find((session) => session.id === sessionId)?.status).toBe("completed");
+    expect(repo.exactRanking(setId)?.ordered.map((id) => repo.values(setId).find((value) => value.id === id)?.name)).toEqual([
+      "Alpha", "Beta", "Delta", "Gamma",
+    ]);
   });
 
   it("edits a definition, creates an evidence claim, and retains revision history", async () => {

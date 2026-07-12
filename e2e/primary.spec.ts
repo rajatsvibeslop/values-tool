@@ -8,19 +8,19 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("imports values, completes comparisons, and inspects rankings and history", async ({ page }) => {
-  const card = page.locator(".grid.three-col > .panel-body").filter({ hasText: "Editable values card sort" });
-  await card.getByRole("button", { name: "Import preset" }).click();
+  const card = page.locator(".preset-row").filter({ hasText: "Editable values card sort" });
+  await card.getByRole("button", { name: "Use set" }).click();
   await expect(page.getByText("Current top values")).toBeVisible();
 
   await page.locator('a[href="#compare"]').first().click();
   await page.getByLabel("Session name").fill("E2E priorities");
   await page.getByRole("button", { name: "Start session" }).click();
-  await expect(page.getByText("0 done · 20 left")).toBeVisible();
+  await expect(page.getByText("1/20 placed", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: /Left wins/ }).click();
-  await expect(page.getByText("1 done · 19 left")).toBeVisible();
+  await expect(page.getByText("2/20 placed", { exact: true })).toBeVisible();
 
   await page.locator('a[href="#rankings"]').first().click();
-  await expect(page.getByRole("heading", { name: "Posterior ordering" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Estimated ordering" })).toBeVisible();
   await expect(page.locator("tbody tr")).toHaveCount(20);
 
   await page.locator('a[href="#history"]').first().click();
@@ -29,8 +29,8 @@ test("imports values, completes comparisons, and inspects rankings and history",
 });
 
 test("persists the SQLite database in IndexedDB across reloads", async ({ page }) => {
-  const card = page.locator(".grid.three-col > .panel-body").filter({ hasText: "Schwartz 10 broad basic values" });
-  await card.getByRole("button", { name: "Import preset" }).click();
+  const card = page.locator(".preset-row").filter({ hasText: "Schwartz 10 broad basic values" });
+  await card.getByRole("button", { name: "Use set" }).click();
   await expect(page.getByText("Current top values")).toBeVisible();
   await page.reload();
   await expect(page.getByText("Current top values")).toBeVisible();
@@ -39,7 +39,7 @@ test("persists the SQLite database in IndexedDB across reloads", async ({ page }
 });
 
 test("lets a new session choose among multiple value sets", async ({ page }) => {
-  await page.locator(".grid.three-col > .panel-body").filter({ hasText: "Editable values card sort" }).getByRole("button", { name: "Import preset" }).click();
+  await page.locator(".preset-row").filter({ hasText: "Editable values card sort" }).getByRole("button", { name: "Use set" }).click();
   await page.locator('a[href="#values"]').first().click();
   const presetPanel = page.locator(".panel").filter({ has: page.getByRole("heading", { name: "Import built-in preset" }) });
   const schwartz = presetPanel.locator(".spread").filter({ hasText: "Schwartz 10 broad basic values" });
@@ -56,7 +56,7 @@ test("lets a new session choose among multiple value sets", async ({ page }) => 
 
 test("shares a read-only ranking snapshot by URL", async ({ page, browser }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "One browser project is sufficient for link portability");
-  await page.locator(".grid.three-col > .panel-body").filter({ hasText: "Schwartz 10 broad basic values" }).getByRole("button", { name: "Import preset" }).click();
+  await page.locator(".preset-row").filter({ hasText: "Schwartz 10 broad basic values" }).getByRole("button", { name: "Use set" }).click();
   await page.locator('a[href="#rankings"]').first().click();
   await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.getByRole("button", { name: "Share results" }).click();
@@ -73,16 +73,35 @@ test("shares a read-only ranking snapshot by URL", async ({ page, browser }, tes
 
 test("supports keyboard decisions and mobile navigation", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "mobile", "Mobile-specific layout check");
-  const card = page.locator(".grid.three-col > .panel-body").filter({ hasText: "Editable values card sort" });
-  await card.getByRole("button", { name: "Import preset" }).click();
+  const card = page.locator(".preset-row").filter({ hasText: "Editable values card sort" });
+  await card.getByRole("button", { name: "Use set" }).click();
   await page.locator('a[href="#compare"]').first().click();
   await page.getByLabel("Session name").fill("Mobile session");
   await page.getByRole("button", { name: "Start session" }).click();
   await expect(page.getByRole("button", { name: /Left wins/ })).toBeVisible();
   await page.waitForTimeout(100);
   await page.keyboard.press("1");
-  await expect(page.getByText("1 done · 19 left")).toBeVisible();
+  await expect(page.getByText("2/20 placed", { exact: true })).toBeVisible();
   const body = await page.locator("body").boundingBox();
   expect(body?.width).toBeLessThanOrEqual(420);
   await expect(page.locator(".sidebar")).toBeVisible();
+});
+
+test("includes the broad and Miller value catalogs", async ({ page }) => {
+  const cards = page.locator(".preset-row");
+  await expect(cards.filter({ hasText: "Broad 100 personal values" })).toContainText("100");
+  await expect(cards.filter({ hasText: "Miller Personal Values Card Sort" })).toContainText("83");
+});
+
+test("exports a self-contained HTML tier report", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "One download check is sufficient");
+  const card = page.locator(".preset-row").filter({ hasText: "Schwartz 10 broad basic values" });
+  await card.getByRole("button", { name: "Use set" }).click();
+  await page.locator('a[href="#reports"]').first().click();
+  await expect(page.getByRole("heading", { name: "Stable tiers" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Definitely above or below" })).toBeVisible();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "HTML" }).click();
+  const report = await downloadPromise;
+  expect(report.suggestedFilename()).toMatch(/\.html$/);
 });

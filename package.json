@@ -18,6 +18,8 @@
     "db:seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
+    "@fontsource-variable/instrument-sans": "^5.2.8",
+    "@fontsource/ibm-plex-mono": "^5.2.7",
     "better-sqlite3": "^12.11.1",
     "drizzle-orm": "^0.45.2",
     "lucide-react": "^0.468.0",

@@ -1,0 +1,509 @@
+{
+  "slug": "miller-personal-values",
+  "name": "Miller Personal Values Card Sort",
+  "description": "The complete 83-value public-domain card sort for identifying five to ten central personal values.",
+  "citation": "Miller, W. R., C'de Baca, J., Matthews, D. B., & Wilbourne, P. L. (2001). Personal Values Card Sort. University of New Mexico.",
+  "sourceUrl": "https://casaa.unm.edu/assets/inst/personal-values-card-sort-2.pdf",
+  "licenseNote": "Public-domain instrument distributed by the University of New Mexico Center on Alcohol, Substance Use, and Addictions.",
+  "taxonomy": "Miller Personal Values Card Sort (2001)",
+  "values": [
+    {
+      "id": "miller-01-acceptance",
+      "name": "Acceptance",
+      "definition": "To be accepted as I am",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-02-accuracy",
+      "name": "Accuracy",
+      "definition": "To be accurate in my opinions and beliefs",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-03-achievement",
+      "name": "Achievement",
+      "definition": "To have important accomplishments",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-04-adventure",
+      "name": "Adventure",
+      "definition": "To have new and exciting experiences",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-05-attractiveness",
+      "name": "Attractiveness",
+      "definition": "To be physically attractive",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-06-authority",
+      "name": "Authority",
+      "definition": "To be in charge of and responsible for others",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-07-autonomy",
+      "name": "Autonomy",
+      "definition": "To be self-determined and independent",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-08-beauty",
+      "name": "Beauty",
+      "definition": "To appreciate beauty around me",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-09-caring",
+      "name": "Caring",
+      "definition": "To take care of others",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-10-challenge",
+      "name": "Challenge",
+      "definition": "To take on difficult tasks and problems",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-11-comfort",
+      "name": "Comfort",
+      "definition": "To have a pleasant and comfortable life",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-12-change",
+      "name": "Change",
+      "definition": "To have a life full of change and variety",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-13-commitment",
+      "name": "Commitment",
+      "definition": "To make enduring, meaningful commitments",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-14-compassion",
+      "name": "Compassion",
+      "definition": "To feel and act on concern for others",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-15-contribution",
+      "name": "Contribution",
+      "definition": "To make a lasting contribution in the world",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-16-cooperation",
+      "name": "Cooperation",
+      "definition": "To work collaboratively with others",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-17-courtesy",
+      "name": "Courtesy",
+      "definition": "To be considerate and polite toward others",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-18-creativity",
+      "name": "Creativity",
+      "definition": "To have new and original ideas",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-19-dependability",
+      "name": "Dependability",
+      "definition": "To be reliable and trustworthy",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-20-duty",
+      "name": "Duty",
+      "definition": "To carry out my duties and obligations",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-21-ecology",
+      "name": "Ecology",
+      "definition": "To live in harmony with the environment",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-22-excitement",
+      "name": "Excitement",
+      "definition": "To have a life full of thrills and stimulation",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-23-faithfulness",
+      "name": "Faithfulness",
+      "definition": "To be loyal and true in relationships",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-24-fame",
+      "name": "Fame",
+      "definition": "To be known and recognized",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-25-family",
+      "name": "Family",
+      "definition": "To have a happy, loving family",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-26-fitness",
+      "name": "Fitness",
+      "definition": "To be physically fit and strong",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-27-flexibility",
+      "name": "Flexibility",
+      "definition": "To adjust to new circumstances easily",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-28-forgiveness",
+      "name": "Forgiveness",
+      "definition": "To be forgiving of others",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-29-friendship",
+      "name": "Friendship",
+      "definition": "To have close, supportive friends",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-30-fun",
+      "name": "Fun",
+      "definition": "To play and have fun",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-31-generosity",
+      "name": "Generosity",
+      "definition": "To give what I have to others",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-32-genuineness",
+      "name": "Genuineness",
+      "definition": "To act in a manner that is true to who I am",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-33-god-s-will",
+      "name": "God's Will",
+      "definition": "To seek and obey the will of God",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-34-growth",
+      "name": "Growth",
+      "definition": "To keep changing and growing",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-35-health",
+      "name": "Health",
+      "definition": "To be physically well and healthy",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-36-helpfulness",
+      "name": "Helpfulness",
+      "definition": "To be helpful to others",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-37-honesty",
+      "name": "Honesty",
+      "definition": "To be honest and truthful",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-38-hope",
+      "name": "Hope",
+      "definition": "To maintain a positive and optimistic outlook",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-39-humility",
+      "name": "Humility",
+      "definition": "To be modest and unassuming",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-40-humor",
+      "name": "Humor",
+      "definition": "To see the humorous side of myself and the world",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-41-independence",
+      "name": "Independence",
+      "definition": "To be free from dependence on others",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-42-industry",
+      "name": "Industry",
+      "definition": "To work hard and well at my life tasks",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-43-inner-peace",
+      "name": "Inner Peace",
+      "definition": "To experience personal peace",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-44-intimacy",
+      "name": "Intimacy",
+      "definition": "To share my innermost experiences with others",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-45-justice",
+      "name": "Justice",
+      "definition": "To promote fair and equal treatment for all",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-46-knowledge",
+      "name": "Knowledge",
+      "definition": "To learn and contribute valuable knowledge",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-47-leisure",
+      "name": "Leisure",
+      "definition": "To take time to relax and enjoy",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-48-loved",
+      "name": "Loved",
+      "definition": "To be loved by those close to me",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-49-loving",
+      "name": "Loving",
+      "definition": "To give love to others",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-50-mastery",
+      "name": "Mastery",
+      "definition": "To be competent in my everyday activities",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-51-mindfulness",
+      "name": "Mindfulness",
+      "definition": "To live conscious and mindful of the present moment",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-52-moderation",
+      "name": "Moderation",
+      "definition": "To avoid excesses and find a middle ground",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-53-monogamy",
+      "name": "Monogamy",
+      "definition": "To have one close, loving relationship",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-54-non-conformity",
+      "name": "Non-conformity",
+      "definition": "To question or challenge authority and norms",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-55-nurturance",
+      "name": "Nurturance",
+      "definition": "To take care of and nurture others",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-56-openness",
+      "name": "Openness",
+      "definition": "To be open to new experiences, ideas, and options",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-57-order",
+      "name": "Order",
+      "definition": "To have a life that is well-ordered and organized",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-58-passion",
+      "name": "Passion",
+      "definition": "To have deep feelings about ideas, activities, or people",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-59-pleasure",
+      "name": "Pleasure",
+      "definition": "To feel good",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-60-popularity",
+      "name": "Popularity",
+      "definition": "To be well-liked by many people",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-61-power",
+      "name": "Power",
+      "definition": "To have control over others",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-62-purpose",
+      "name": "Purpose",
+      "definition": "To have meaning and direction in my life",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-63-rationality",
+      "name": "Rationality",
+      "definition": "To be guided by reason and logic",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-64-realism",
+      "name": "Realism",
+      "definition": "To see and act realistically and practically",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-65-responsibility",
+      "name": "Responsibility",
+      "definition": "To make and carry out responsible decisions",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-66-risk",
+      "name": "Risk",
+      "definition": "To take risks and chances",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-67-romance",
+      "name": "Romance",
+      "definition": "To have intense, exciting love in my life",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-68-safety",
+      "name": "Safety",
+      "definition": "To be safe and secure",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-69-self-acceptance",
+      "name": "Self-Acceptance",
+      "definition": "To accept myself as I am",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-70-self-control",
+      "name": "Self-Control",
+      "definition": "To be disciplined in my own actions",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-71-self-esteem",
+      "name": "Self-Esteem",
+      "definition": "To feel good about myself",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-72-self-knowledge",
+      "name": "Self-Knowledge",
+      "definition": "To have a deep and honest understanding of myself",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-73-service",
+      "name": "Service",
+      "definition": "To be of service to others",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-74-sexuality",
+      "name": "Sexuality",
+      "definition": "To have an active and satisfying sex life",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-75-simplicity",
+      "name": "Simplicity",
+      "definition": "To live life simply, with minimal needs",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-76-solitude",
+      "name": "Solitude",
+      "definition": "To have time and space where I can be apart from others",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-77-spirituality",
+      "name": "Spirituality",
+      "definition": "To grow and mature spiritually",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-78-stability",
+      "name": "Stability",
+      "definition": "To have a life that stays fairly consistent",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-79-tolerance",
+      "name": "Tolerance",
+      "definition": "To accept and respect those who differ from me",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-80-tradition",
+      "name": "Tradition",
+      "definition": "To follow respected patterns of the past",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-81-virtue",
+      "name": "Virtue",
+      "definition": "To live a morally pure and excellent life",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-82-wealth",
+      "name": "Wealth",
+      "definition": "To have plenty of money",
+      "category": "Personal values"
+    },
+    {
+      "id": "miller-83-world-peace",
+      "name": "World Peace",
+      "definition": "To work to promote peace in the world",
+      "category": "Personal values"
+    }
+  ]
+}

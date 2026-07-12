@@ -1,7 +1,12 @@
-import { balancedSides, selectMatches } from "@/domain/matchmaking";
+import { balancedSides } from "@/domain/matchmaking";
+import {
+  exactRankingProgress,
+  type ExactDecision,
+  type ExactRankingProgress,
+} from "@/domain/exact-ranking";
 import { replayRatings, effectiveEvents } from "@/domain/rating";
 import { detectTensions, type TensionSuggestion } from "@/domain/tensions";
-import { initialRating, type Rating, type RatingEvent } from "@/domain/types";
+import type { Rating, RatingEvent } from "@/domain/types";
 import { DEFAULT_SETTINGS } from "@/db/defaults";
 import type { BrowserDatabase } from "./database";
 import schwartz10 from "../../data/presets/schwartz-10.json";
@@ -10,8 +15,12 @@ import rokeachTerminal from "../../data/presets/rokeach-terminal.json";
 import rokeachInstrumental from "../../data/presets/rokeach-instrumental.json";
 import cardSort from "../../data/presets/card-sort.json";
 import emptyCustom from "../../data/presets/empty-custom.json";
+import broad100 from "../../data/presets/broad-100.json";
+import millerPersonalValues from "../../data/presets/miller-personal-values.json";
 
 export const presetCatalog = [
+  broad100,
+  millerPersonalValues,
   schwartz10,
   schwartz19,
   rokeachTerminal,
@@ -111,6 +120,12 @@ export interface EventRow {
   contextIds?: string[];
 }
 
+export interface StoredExactRanking extends ExactRankingProgress {
+  sessionId: string;
+  scope: string;
+  updatedAt: number;
+}
+
 export class BrowserRepository {
   constructor(readonly db: BrowserDatabase) {}
 
@@ -170,6 +185,111 @@ export class BrowserRepository {
     return this.db.query<QueueRow>(
       "SELECT * FROM comparison_queue WHERE session_id=? ORDER BY position",
       [sessionId],
+    );
+  }
+
+  private sessionContexts(sessionId: string): string[] {
+    return this.db
+      .query<{ context_id: string }>(
+        "SELECT context_id FROM session_contexts WHERE session_id=? ORDER BY context_id",
+        [sessionId],
+      )
+      .map((row) => row.context_id);
+  }
+
+  private exactScope(sessionId: string): string {
+    const contexts = this.sessionContexts(sessionId);
+    return contexts.length === 0
+      ? "global"
+      : contexts.length === 1
+        ? `context:${contexts[0]}`
+        : `contexts:${contexts.join("+")}`;
+  }
+
+  private exactDecisions(session: SessionRow): ExactDecision[] {
+    const contexts = this.sessionContexts(session.id);
+    const revisions = new Map(
+      this.db
+        .query<{ value_id: string; revised_at: number }>(
+          "SELECT value_id,MAX(created_at) revised_at FROM definition_revisions GROUP BY value_id",
+        )
+        .map((row) => [row.value_id, row.revised_at]),
+    );
+    const rows = this.history(session.value_set_id)
+      .filter((event) => !contexts.length || contexts.every((id) => event.contextIds?.includes(id)))
+      .filter(
+        (event) =>
+          event.occurred_at >= (revisions.get(event.left_value_id) ?? 0) &&
+          event.occurred_at >= (revisions.get(event.right_value_id) ?? 0),
+      )
+      .sort((a, b) => a.occurred_at - b.occurred_at || a.id.localeCompare(b.id));
+    const superseded = new Set(
+      rows.map((event) => event.supersedes_event_id).filter(Boolean),
+    );
+    const effective = rows.filter(
+      (event) => !superseded.has(event.id) && ["left", "right", "tie"].includes(event.result),
+    );
+    const byPair = new Map<string, EventRow[]>();
+    for (const event of effective) {
+      const key = [event.left_value_id, event.right_value_id].sort().join(":");
+      const bucket = byPair.get(key) ?? [];
+      bucket.push(event);
+      byPair.set(key, bucket);
+    }
+    const decisions: ExactDecision[] = [];
+    for (const bucket of byPair.values()) {
+      const inSession = bucket.filter((event) => event.session_id === session.id);
+      const chosen = inSession.at(-1);
+      if (chosen) {
+        decisions.push({ leftValueId: chosen.left_value_id, rightValueId: chosen.right_value_id, result: chosen.result });
+        continue;
+      }
+      const normalized = new Set(
+        bucket.map((event) => {
+          if (event.result === "tie") return "tie";
+          const winner = event.result === "left" ? event.left_value_id : event.right_value_id;
+          return winner;
+        }),
+      );
+      if (normalized.size === 1) {
+        const event = bucket.at(-1)!;
+        decisions.push({ leftValueId: event.left_value_id, rightValueId: event.right_value_id, result: event.result });
+      }
+    }
+    return decisions;
+  }
+
+  exactProgress(sessionId: string): ExactRankingProgress | null {
+    const session = this.db.one<SessionRow>(
+      "SELECT * FROM comparison_sessions WHERE id=?",
+      [sessionId],
+    );
+    if (!session) return null;
+    return exactRankingProgress({
+      valueIds: this.values(session.value_set_id).map((value) => value.id),
+      seed: `${session.value_set_id}:${this.exactScope(session.id)}`,
+      decisions: this.exactDecisions(session),
+    });
+  }
+
+  exactRanking(setId: string, scope = "global"): StoredExactRanking | null {
+    const row = this.db.one<{ value: string }>(
+      "SELECT value FROM application_settings WHERE key=?",
+      [`exact-ranking:${setId}:${scope}`],
+    );
+    return row ? parsed<StoredExactRanking | null>(row.value, null) : null;
+  }
+
+  orderedRatings(setId: string, scope = "global"): RatingRow[] {
+    const rows = this.ratings(setId, scope);
+    const exact = this.exactRanking(setId, scope);
+    if (!exact?.complete) return rows;
+    const rank = new Map(exact.ordered.map((id, index) => [id, index]));
+    return [...rows].sort(
+      (a, b) =>
+        (rank.get(a.value_id) ?? Number.MAX_SAFE_INTEGER) -
+          (rank.get(b.value_id) ?? Number.MAX_SAFE_INTEGER) ||
+        b.mu - a.mu,
     );
   }
 
@@ -260,7 +380,12 @@ export class BrowserRepository {
         preset.name,
         preset.description,
         "preset",
-        json({ preset: slug, citation: preset.citation }),
+        json({
+          preset: slug,
+          citation: preset.citation,
+          licenseNote: preset.licenseNote,
+          sourceUrl: "sourceUrl" in preset ? preset.sourceUrl : undefined,
+        }),
         0,
         stamp,
         stamp,
@@ -357,6 +482,9 @@ export class BrowserRepository {
         "Value created",
         stamp,
       ]);
+      this.db.run("DELETE FROM application_settings WHERE key LIKE ?", [
+        `exact-ranking:${setId}:%`,
+      ]);
     });
     await this.recompute(setId);
   }
@@ -417,6 +545,16 @@ export class BrowserRepository {
         json(input),
         stamp,
       ]);
+      this.db
+        .query<{ value_set_id: string }>(
+          "SELECT value_set_id FROM value_set_memberships WHERE value_id=?",
+          [valueId],
+        )
+        .forEach((membership) =>
+          this.db.run("DELETE FROM application_settings WHERE key LIKE ?", [
+            `exact-ranking:${membership.value_set_id}:%`,
+          ]),
+        );
     });
   }
 
@@ -425,13 +563,17 @@ export class BrowserRepository {
       "SELECT value_set_id FROM value_set_memberships WHERE value_id=?",
       [valueId],
     );
-    await this.db.transaction(() =>
+    await this.db.transaction(() => {
       this.db.run('UPDATE "values" SET active=?,updated_at=? WHERE id=?', [
         active ? 1 : 0,
         now(),
         valueId,
-      ]),
-    );
+      ]);
+      for (const membership of memberships)
+        this.db.run("DELETE FROM application_settings WHERE key LIKE ?", [
+          `exact-ranking:${membership.value_set_id}:%`,
+        ]);
+    });
     for (const membership of memberships)
       await this.recompute(membership.value_set_id);
   }
@@ -614,7 +756,7 @@ export class BrowserRepository {
         [
           id,
           name,
-          "Adaptive comparison session",
+          "Exact ordering session",
           setId,
           "active",
           stamp,
@@ -644,34 +786,25 @@ export class BrowserRepository {
       [sessionId],
     );
     if (!session) throw new Error("Session not found");
-    const values = this.values(session.value_set_id);
-    const settings = this.settings();
-    const ratings = this.ratings(session.value_set_id);
-    const events = this.events(session.value_set_id);
-    const candidates = selectMatches({
-      values: values.map((value) => ({
-        id: value.id,
-        name: value.name,
-        parentCategory: value.parent_category,
-        aliases: value.aliases ?? [],
-        rating:
-          ratings.find((rating) => rating.value_id === value.id) ??
-          initialRating(settings.rating),
-      })),
-      events,
-      config: settings.rating,
-      weights: settings.selection,
-      topK: settings.convergence.topK,
-      minimumCoverage: settings.convergence.minimumComparisons,
-      count: 20,
-    }).map((candidate, index) =>
-      balancedSides(candidate, `${sessionId}:${events.length}:${index}`),
-    );
+    const progress = this.exactProgress(sessionId);
+    if (!progress) throw new Error("Unable to calculate ordering progress");
+    const candidate = progress.nextPair
+      ? balancedSides(
+          {
+            ...progress.nextPair,
+            reason: `Exact ordering · ${progress.placed}/${progress.total} placed`,
+            score: progress.worstCase - progress.reusedComparisons,
+            details: ["Binary search of the remaining insertion interval"],
+          },
+          `${sessionId}:${session.completed_count}`,
+        )
+      : null;
     await this.db.transaction(() => {
-      this.db.run("DELETE FROM comparison_queue WHERE session_id=?", [
-        sessionId,
-      ]);
-      candidates.forEach((candidate, position) =>
+      this.db.run(
+        "DELETE FROM comparison_queue WHERE session_id=? AND reason!='Manual comparison'",
+        [sessionId],
+      );
+      if (candidate)
         this.db.run("INSERT INTO comparison_queue VALUES (?,?,?,?,?,?,?,?)", [
           uid(),
           sessionId,
@@ -679,10 +812,26 @@ export class BrowserRepository {
           candidate.rightValueId,
           candidate.reason,
           candidate.score,
-          position,
+          0,
           now(),
-        ]),
-      );
+        ]);
+      else {
+        const scope = this.exactScope(sessionId);
+        const stored: StoredExactRanking = {
+          ...progress,
+          sessionId,
+          scope,
+          updatedAt: now(),
+        };
+        this.db.run(
+          "INSERT INTO application_settings(key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at",
+          [`exact-ranking:${session.value_set_id}:${scope}`, json(stored), now()],
+        );
+        this.db.run(
+          "UPDATE comparison_sessions SET status='completed',ended_at=?,after_snapshot_id=?,updated_at=? WHERE id=?",
+          [now(), this.snapshot(session.value_set_id, "exact-order-complete", null), now(), sessionId],
+        );
+      }
     });
   }
 
@@ -705,6 +854,10 @@ export class BrowserRepository {
   }): Promise<void> {
     const id = uid();
     const stamp = now();
+    const queueItem = this.db.one<QueueRow>(
+      "SELECT * FROM comparison_queue WHERE session_id=? AND ((left_value_id=? AND right_value_id=?) OR (left_value_id=? AND right_value_id=?)) ORDER BY position LIMIT 1",
+      [input.sessionId, input.leftId, input.rightId, input.rightId, input.leftId],
+    );
     await this.db.transaction(() => {
       this.db.run(
         "INSERT INTO comparison_events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -723,7 +876,7 @@ export class BrowserRepository {
           null,
           "",
           0,
-          "adaptive queue",
+          queueItem?.reason ?? "Manual comparison",
           1,
           stamp,
           stamp,
@@ -770,8 +923,7 @@ export class BrowserRepository {
       this.snapshot(input.setId, "after-comparison", id),
     );
     await this.refreshTensions(input.setId);
-    if (this.queue(input.sessionId).length < 5)
-      await this.regenerateQueue(input.sessionId);
+    await this.regenerateQueue(input.sessionId);
   }
 
   async correct(
@@ -806,6 +958,7 @@ export class BrowserRepository {
         );
     });
     await this.recompute(original.value_set_id);
+    if (original.session_id) await this.regenerateQueue(original.session_id);
   }
 
   async refreshTensions(setId: string): Promise<void> {

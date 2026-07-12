@@ -1,13 +1,13 @@
 # Values Tool
 
-Values Tool is a local-first analytical application for ranking personal values through adaptive pairwise comparisons. It uses a two-player TrueSkill-style Bayesian model, retains uncertainty instead of forcing a total order, and preserves the user's original reasoning as evidence.
+Values Tool is a local-first analytical application for ranking personal values through strategic pairwise comparisons. A finite exact-order scheduler establishes a stable ordering efficiently; a two-player TrueSkill-style Bayesian model retains uncertainty, tiers, and context dependence. Every decision can preserve the user's original reasoning as evidence.
 
 The application has two delivery adapters:
 
 - **GitHub Pages / static:** React + SQLite WASM (`sql.js`) + Drizzle, persisted as database bytes in IndexedDB. This is the canonical hosted experience and needs no server.
 - **Local Node:** Next.js App Router + `better-sqlite3` + Drizzle. This provides server actions and a file-backed `data/values.db`.
 
-Both adapters share the schema, rating engine, adaptive selector, convergence diagnostics, tension detection, imports, and tests. No authentication, secrets, cloud database, or external API is required.
+Both adapters share the schema, rating engine, convergence diagnostics, tension detection, imports, and tests. No authentication, secrets, cloud database, or external API is required.
 
 ## Quick Start
 
@@ -67,7 +67,7 @@ npx playwright install chromium
 
 In the repository's GitHub settings, set **Pages > Build and deployment > Source** to **GitHub Actions**. The workflow runs unit/integration tests before deployment.
 
-Browser data remains on the device in IndexedDB. Ranking results can be shared with the **Share results** button. The generated URL contains a read-only statistical snapshot (value names, means, uncertainty, evidence counts, scope, and timestamp); it intentionally excludes comparison notes and the rest of the database.
+Browser data remains on the device in IndexedDB. Ranking results can be shared with the **Share results** button. The generated URL contains a read-only snapshot with the tier list, credible intervals, ordering-relation matrix, means, uncertainty, evidence counts, scope, and timestamp; it intentionally excludes comparison notes and the rest of the database.
 
 ## Rating Model
 
@@ -93,7 +93,29 @@ Three explicit scopes are maintained:
 
 The ranking UI always labels the scope. Context-only results with sparse evidence remain visibly uncertain.
 
-## Adaptive Selection
+## Exact Ordering and Adaptive Verification
+
+The canonical browser experience uses `src/domain/exact-ranking.ts` to schedule a
+deterministic binary-insertion order. This is a finite process rather than a queue that
+silently replenishes:
+
+- The next comparison divides the remaining insertion interval approximately in half.
+- Consistent prior answers are reused; already implied relations are not asked again.
+- The starting order is seeded, deterministic, and not alphabetical.
+- A 100-value total order needs at least `ceil(log2(100!)) = 525` binary answers in the
+  worst case. This scheduler needs at most 573 decisive answers.
+- The queue shows one item because the answer determines the next valid midpoint.
+- Ties are retained as tier evidence. Incomparable, skipped, and unclear answers do not
+  become wins or draws.
+
+After an ordering exists, uncertainty and contradiction diagnostics identify the
+adjacent boundaries worth retesting. This concentrates repeated sampling where it can
+change the order instead of spending comparisons on distant, already settled pairs.
+The research and assumptions are documented in
+[`docs/ranking-strategy.md`](docs/ranking-strategy.md).
+
+The reusable selector in `src/domain/matchmaking.ts` remains available for exploratory
+and verification work. It scores eligible pairs using configurable components:
 
 `src/domain/matchmaking.ts` scores every eligible pair using configurable, inspectable components:
 
@@ -105,7 +127,7 @@ The ranking UI always labels the scope. Context-only results with sparse evidenc
 - observed contradiction and context disagreement;
 - a penalty for likely synonyms, strengthened after malformed comparisons.
 
-The immediately previous pair is excluded. Ties are broken deterministically, while left/right presentation is deterministically balanced from a session seed. The queue exposes its primary reason and supports manual pairs, reordering, and regeneration.
+The immediately previous exploratory pair is excluded. Ties are broken deterministically, while left/right presentation is deterministically balanced from a session seed. Manual comparisons remain available alongside the required exact-order comparison.
 
 ## Convergence
 
@@ -129,13 +151,18 @@ claims.csv                 claim_sources.csv
 tensions.csv               tension_sources.csv
 ```
 
-Reports export as Markdown or printable HTML and label statistical inference, source statements, rule-based aggregation, manual interpretation, and draft synthesis.
+Reports export as Markdown, self-contained HTML, or print. The HTML report starts with a stable tier list, a 90% credible-interval plot, and a pairwise relation matrix that distinguishes definitely above, definitely below, and unresolved overlap. It also labels statistical inference, source statements, rule-based aggregation, manual interpretation, and draft synthesis.
 
 ## Presets
 
 Preset catalogs are ordinary JSON files in `data/presets/`. Each contains a slug, name, description, citation, redistribution note, taxonomy, and values. Add a file matching that shape; both adapters discover or bundle it without changes to rating logic.
 
-Bundled catalogs contain short original paraphrases and bibliographic metadata, not proprietary questionnaire prompts or scoring materials.
+Bundled catalogs include Schwartz 10 and 19, Rokeach terminal and instrumental values,
+an editable starter set, the original **Broad 100** catalog, and the complete 83-value
+**Miller Personal Values Card Sort**. [Miller et al. (University of New Mexico,
+2001)](https://casaa.unm.edu/assets/inst/personal-values-card-sort-2.pdf) is public
+domain. The Broad 100 definitions are original to this project. Proprietary lists
+whose terms do not permit redistribution are not bundled.
 
 ## Data Model
 

@@ -38,6 +38,11 @@ import {
 import { estimateRanks } from "@/domain/statistics";
 import { convergenceDiagnostics } from "@/domain/convergence";
 import { conservativeScore, TrueSkillRatingSystem } from "@/domain/rating";
+import {
+  intervalDomain,
+  rankRelation,
+  stableTiers,
+} from "@/domain/ranking-view";
 import type { ComparisonResult, Confidence, Strength } from "@/domain/types";
 import { DEFAULT_SETTINGS } from "@/db/defaults";
 import Papa from "papaparse";
@@ -63,7 +68,7 @@ const nav: [Route, string, typeof Activity][] = [
   ["tensions", "Tensions", TriangleAlert],
   ["history", "History", History],
   ["reports", "Reports", FileText],
-  ["data", "Imports & exports", Database],
+  ["data", "Data", Database],
   ["settings", "Settings", Settings],
 ];
 const routeFromHash = (): Route => {
@@ -111,12 +116,9 @@ export function StaticApp() {
       <div className="page">
         <div className="panel empty">
           <strong>
-            {error
-              ? "Database could not start"
-              : "Opening local SQLite database"}
+            {error ? "Workspace could not open" : "Opening your workspace"}
           </strong>
-          {error ||
-            "Loading the bundled SQLite WASM engine and IndexedDB data..."}
+          {error || "Loading your saved work…"}
         </div>
       </div>
     );
@@ -149,7 +151,6 @@ export function StaticApp() {
           ))}
         </nav>
         <div className="sidebar-footer">
-          <span className="small muted">SQLite · this browser</span>
           <button
             className="btn btn-icon btn-sm"
             onClick={theme}
@@ -311,19 +312,18 @@ function Dashboard({ repo, db, mutate }: ViewProps) {
         description="Rank personal values through adaptive comparisons while preserving the evidence behind every choice."
       >
         <Panel title="Choose a starting value set">
-          <div className="grid three-col">
+          <div className="preset-list">
             {presetCatalog.map((preset) => (
               <div
-                className="panel-body stack"
-                style={{ border: "1px solid var(--border)", borderRadius: 6 }}
+                className="preset-row"
                 key={preset.slug}
               >
                 <div>
                   <strong>{preset.name}</strong>
+                  <span className="mono muted">{preset.values.length}</span>
                 </div>
-                <span className="badge">{preset.values.length} values</span>
                 <button
-                  className="btn btn-primary"
+                  className="btn btn-sm"
                   onClick={() =>
                     mutate(async () => {
                       const id = await repo.importPreset(preset.slug);
@@ -331,7 +331,7 @@ function Dashboard({ repo, db, mutate }: ViewProps) {
                     })
                   }
                 >
-                  <Plus size={15} /> Import preset
+                  <Plus size={15} /> Use set
                 </button>
               </div>
             ))}
@@ -340,9 +340,10 @@ function Dashboard({ repo, db, mutate }: ViewProps) {
       </Page>
     );
   const values = repo.values(set.id);
-  const ratings = repo.ratings(set.id);
+  const ratings = repo.orderedRatings(set.id);
   const sessions = repo.sessions();
   const history = repo.history(set.id);
+  const exactRanking = repo.exactRanking(set.id);
   const settings = repo.settings();
   const snapshots = db.query<{ id: string }>(
     "SELECT id FROM rating_snapshots WHERE value_set_id=? ORDER BY created_at DESC LIMIT ?",
@@ -394,7 +395,7 @@ function Dashboard({ repo, db, mutate }: ViewProps) {
         <Metric
           label="Comparisons"
           value={history.length}
-          detail="Append-only events"
+          detail="Recorded decisions"
         />
         <Metric
           label="Evidence gaps"
@@ -456,13 +457,21 @@ function Dashboard({ repo, db, mutate }: ViewProps) {
         <div className="stack">
           <Panel title="Convergence">
             <span className="badge badge-accent">
-              {diagnostics.state.replaceAll("-", " ")}
+              {exactRanking?.complete
+                ? "order complete"
+                : diagnostics.state.replaceAll("-", " ")}
             </span>
-            <p>{diagnostics.explanation}</p>
+            <p>
+              {exactRanking?.complete
+                ? `All ${exactRanking.total} values are placed. Interval overlap shows which boundaries still merit verification.`
+                : diagnostics.explanation}
+            </p>
             <div className="progress">
               <span
                 style={{
-                  width: `${Math.round(diagnostics.topKStability * 100)}%`,
+                  width: exactRanking?.complete
+                    ? "100%"
+                    : `${Math.round(diagnostics.topKStability * 100)}%`,
                 }}
               />
             </div>
@@ -975,6 +984,7 @@ function Compare({ repo, db, mutate }: ViewProps) {
     ? undefined
     : sessions.find((item) => item.id === sessionId);
   const queue = session ? repo.queue(session.id) : [];
+  const exactProgress = session ? repo.exactProgress(session.id) : null;
   const pair = queue[0];
   const values = session ? repo.values(session.value_set_id) : [];
   const currentRatings = session ? repo.ratings(session.value_set_id) : [];
@@ -1070,7 +1080,7 @@ function Compare({ repo, db, mutate }: ViewProps) {
                         type="checkbox"
                         name="contexts"
                         value={context.id}
-                        defaultChecked={context.id === "general-life"}
+                        defaultChecked={false}
                       />{" "}
                       {context.name}
                     </label>
@@ -1114,20 +1124,36 @@ function Compare({ repo, db, mutate }: ViewProps) {
     return (
       <Page
         title={session.name}
-        description="No matchup is currently queued."
+        description={
+          exactProgress?.complete
+            ? "Ordering complete."
+            : "No matchup is currently queued."
+        }
         actions={
           <button className="btn" onClick={() => setCreating(true)}>
             <Plus size={14} /> New session
           </button>
         }
       >
-        <Panel>
-          <button
-            className="btn btn-primary"
-            onClick={() => mutate(() => repo.regenerateQueue(session.id))}
-          >
-            <RefreshCw size={15} /> Regenerate adaptive queue
-          </button>
+        <Panel title={exactProgress?.complete ? "Ranking ready" : "Next comparison"}>
+          {exactProgress?.complete ? (
+            <div className="spread">
+              <div>
+                <strong>{exactProgress.total} values ordered</strong>
+                <div className="small muted">Review tiers and interval overlap.</div>
+              </div>
+              <a className="btn btn-primary" href="#rankings">
+                View ranking
+              </a>
+            </div>
+          ) : (
+            <button
+              className="btn btn-primary"
+              onClick={() => mutate(() => repo.regenerateQueue(session.id))}
+            >
+              <RefreshCw size={15} /> Continue ordering
+            </button>
+          )}
         </Panel>
       </Page>
     );
@@ -1142,7 +1168,7 @@ function Compare({ repo, db, mutate }: ViewProps) {
   const sessionActions = (
     <div className="row">
       <span className="badge">
-        {session.completed_count} done · {queue.length} left
+        {exactProgress?.placed ?? 0}/{exactProgress?.total ?? values.length} placed
       </span>
       <button className="btn" type="button" onClick={() => setCreating(true)}>
         <Plus size={14} /> New session
@@ -1168,9 +1194,21 @@ function Compare({ repo, db, mutate }: ViewProps) {
   return (
     <Page
       title={session.name}
-      description={`${session.completed_count} completed · ${queue.length} queued · ${pair.reason}`}
+      description={pair.reason}
       actions={sessionActions}
     >
+      <div className="ordering-strip">
+        <div>
+          <span className="ordering-label">PLACE {Math.min((exactProgress?.placed ?? 0) + 1, exactProgress?.total ?? values.length)} OF {exactProgress?.total ?? values.length}</span>
+          <strong>Which should guide the choice?</strong>
+        </div>
+        <div className="ordering-progress" aria-label="Ordering progress">
+          <span style={{ width: `${((exactProgress?.placed ?? 0) / Math.max(1, exactProgress?.total ?? values.length)) * 100}%` }} />
+        </div>
+        <span className="mono muted">
+          ≤ {Math.max(0, (exactProgress?.worstCase ?? 0) - (exactProgress?.reusedComparisons ?? 0))} new
+        </span>
+      </div>
       <form
         onSubmit={(event) => {
           const data = submit(event);
@@ -1289,10 +1327,20 @@ function Compare({ repo, db, mutate }: ViewProps) {
             type="button"
             onClick={() => setNotes((value) => !value)}
           >
-            Decision notes <span className="shortcut">N</span>
+            Add detail <span className="shortcut">N</span>
           </button>
         </div>
-        <Panel>
+        {!notes && (
+          <>
+            <input type="hidden" name="strength" value="moderate" />
+            <input type="hidden" name="confidence" value="confident" />
+            <input type="hidden" name="consideration" value="intrinsic" />
+            {sessionContexts.map((contextId) => (
+              <input key={contextId} type="hidden" name="contexts" value={contextId} />
+            ))}
+          </>
+        )}
+        {notes && <Panel>
           <div className="form-grid">
             <Field label="Strength">
               <select
@@ -1334,7 +1382,6 @@ function Compare({ repo, db, mutate }: ViewProps) {
               </div>
             </div>
           </div>
-          {notes && (
             <div className="form-grid" style={{ marginTop: 14 }}>
               <Field label="Free-form reasoning">
                 <textarea className="textarea" name="reasoning" />
@@ -1380,8 +1427,7 @@ function Compare({ repo, db, mutate }: ViewProps) {
                 </div>
               )}
             </div>
-          )}
-        </Panel>
+        </Panel>}
       </form>
     </Page>
   );
@@ -1393,6 +1439,7 @@ function Queue({ repo, db, mutate }: ViewProps) {
     sessions.find((item) => item.status === "active") ?? sessions[0];
   const queue = session ? repo.queue(session.id) : [];
   const values = session ? repo.values(session.value_set_id) : [];
+  const progress = session ? repo.exactProgress(session.id) : null;
   const move = (item: QueueRow, delta: number) =>
     mutate(() =>
       db.transaction(() => {
@@ -1416,8 +1463,8 @@ function Queue({ repo, db, mutate }: ViewProps) {
       title="Comparison queue"
       description={
         session
-          ? `${session.name} · inspect, reorder, regenerate, or add any manual pair.`
-          : "Start a session to create an adaptive queue."
+          ? session.name
+          : "Start a session to order a value set."
       }
       actions={
         session && (
@@ -1425,14 +1472,17 @@ function Queue({ repo, db, mutate }: ViewProps) {
             className="btn"
             onClick={() => mutate(() => repo.regenerateQueue(session.id))}
           >
-            <RefreshCw size={15} /> Regenerate
+            <RefreshCw size={15} /> Refresh next
           </button>
         )
       }
     >
       {session ? (
         <div className="grid two-col">
-          <Panel title={`${queue.length} proposed matchups`}>
+          <Panel
+            title={progress?.complete ? "Ordering complete" : "Next required comparison"}
+            action={progress && <span className="mono">{progress.placed}/{progress.total} placed</span>}
+          >
             <div className="table-wrap">
               <table className="table">
                 <thead>
@@ -1440,7 +1490,6 @@ function Queue({ repo, db, mutate }: ViewProps) {
                     <th>#</th>
                     <th>Pair</th>
                     <th>Reason</th>
-                    <th>Score</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -1466,7 +1515,6 @@ function Queue({ repo, db, mutate }: ViewProps) {
                           {item.reason}
                         </span>
                       </td>
-                      <td>{item.score.toFixed(2)}</td>
                       <td>
                         <div className="row">
                           <button
@@ -1635,6 +1683,23 @@ function SharedRankings({ result }: { result: SharedResult }) {
     ),
     result.topK,
   );
+  const rows: RatingRow[] = result.rows.map((row) => ({
+    value_id: row.id,
+    value_set_id: "shared",
+    scope_key: result.scope,
+    context_id: null,
+    name: row.name,
+    parent_category: row.category,
+    mu: row.mu,
+    sigma: row.sigma,
+    comparisons: row.comparisons,
+    wins: 0,
+    losses: 0,
+    ties: 0,
+    incomparable: 0,
+    lastComparedAt: null,
+  }));
+  const tiers = stableTiers(rows);
   return (
     <Page
       title={result.name}
@@ -1645,7 +1710,23 @@ function SharedRankings({ result }: { result: SharedResult }) {
         Shared {new Date(result.createdAt).toLocaleString()} ·{" "}
         {result.scope.replace(":", " · ")} · comparison notes are not included.
       </div>
-      <Panel title="Ranking">
+      <Panel title="Stable tiers">
+        <div className="report-tiers">
+          {tiers.map((tier, index) => (
+            <div className="tier-row" key={index}>
+              <div className="tier-label">{index + 1}</div>
+              <div className="tier-values">
+                {tier.map((row) => <strong key={row.value_id}>{row.name}</strong>)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Panel>
+      <div className="grid two-col" style={{ marginTop: 16 }}>
+        <IntervalPlot rows={rows} />
+        <IntervalMatrix rows={rows} tiers={tiers} />
+      </div>
+      <Panel title="Ranking detail">
         <div className="table-wrap">
           <table className="table">
             <thead>
@@ -1726,7 +1807,8 @@ function LocalRankings({ repo, db }: ViewProps) {
       </Page>
     );
   const scope = context ? `${mode}:${context}` : "global";
-  const rows = repo.ratings(set.id, scope);
+  const rows = repo.orderedRatings(set.id, scope);
+  const exactRanking = repo.exactRanking(set.id, scope);
   const settings = repo.settings();
   const estimates = estimateRanks(
     new Map(rows.map((row) => [row.value_id, row])),
@@ -1735,17 +1817,7 @@ function LocalRankings({ repo, db }: ViewProps) {
   const system = new TrueSkillRatingSystem(settings.rating);
   const values = repo.values(set.id);
   const events = repo.events(set.id);
-  const tiers: RatingRow[][] = [];
-  rows.forEach((row) => {
-    const previous = tiers.at(-1)?.at(-1);
-    if (
-      !previous ||
-      Math.abs(previous.mu - row.mu) >
-        Math.sqrt(previous.sigma ** 2 + row.sigma ** 2)
-    )
-      tiers.push([row]);
-    else tiers.at(-1)!.push(row);
-  });
+  const tiers = stableTiers(rows);
   const sharedResult: SharedResult = {
     version: 1,
     name: set.name,
@@ -1811,7 +1883,7 @@ function LocalRankings({ repo, db }: ViewProps) {
       </Panel>
       <div className="tabs spread" style={{ marginTop: 16 }}>
         <div className="row">
-          {["exact", "tiers", "uncertainty"].map((item) => (
+          {["exact", "tiers", "uncertainty", "relations"].map((item) => (
             <button
               className={`tab ${view === item ? "tab-active" : ""}`}
               onClick={() => setView(item)}
@@ -1824,7 +1896,11 @@ function LocalRankings({ repo, db }: ViewProps) {
         <select
           className="select"
           aria-label="More ranking views"
-          value={["exact", "tiers", "uncertainty"].includes(view) ? "" : view}
+          value={
+            ["exact", "tiers", "uncertainty", "relations"].includes(view)
+              ? ""
+              : view
+          }
           onChange={(event) =>
             event.target.value && setView(event.target.value)
           }
@@ -1842,7 +1918,7 @@ function LocalRankings({ repo, db }: ViewProps) {
       </div>
       <div style={{ marginTop: 16 }}>
         {view === "exact" && (
-          <Panel title="Posterior ordering">
+          <Panel title={exactRanking?.complete ? "Exact ordering" : "Estimated ordering"}>
             <div className="table-wrap">
               <table className="table">
                 <thead>
@@ -1913,29 +1989,9 @@ function LocalRankings({ repo, db }: ViewProps) {
           </div>
         )}
         {view === "uncertainty" && (
-          <Panel title="95% posterior intervals">
-            <div className="stack">
-              {rows.map((row) => (
-                <div key={row.value_id}>
-                  <div className="spread">
-                    <strong>{row.name}</strong>
-                    <span className="mono">
-                      {(row.mu - 2 * row.sigma).toFixed(1)}–
-                      {(row.mu + 2 * row.sigma).toFixed(1)}
-                    </span>
-                  </div>
-                  <div className="uncertainty-track" style={{ width: "100%" }}>
-                    <span
-                      style={{
-                        width: `${Math.min(100, (row.sigma / settings.rating.sigma) * 100)}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Panel>
+          <IntervalPlot rows={rows} />
         )}
+        {view === "relations" && <IntervalMatrix rows={rows} tiers={tiers} />}
         {view === "matrix" && <Matrix values={values} events={events} />}
         {view === "probabilities" && (
           <Panel title="Pairwise win probabilities">
@@ -1985,6 +2041,101 @@ function LocalRankings({ repo, db }: ViewProps) {
         )}
       </div>
     </Page>
+  );
+}
+
+function IntervalPlot({ rows }: { rows: RatingRow[] }) {
+  const z = 1.645;
+  const domain = intervalDomain(rows, z);
+  return (
+    <Panel title="90% credible intervals">
+      <div className="interval-list">
+        {rows.map((row, index) => {
+          const low = row.mu - z * row.sigma;
+          const high = row.mu + z * row.sigma;
+          return (
+            <div className="interval-row" key={row.value_id}>
+              <span className="mono interval-rank">{index + 1}</span>
+              <strong>{row.name}</strong>
+              <div className="interval-axis" aria-label={`${row.name}: ${low.toFixed(1)} to ${high.toFixed(1)}`}>
+                <span
+                  className="interval-line"
+                  style={{
+                    left: `${((low - domain.minimum) / domain.span) * 100}%`,
+                    width: `${((high - low) / domain.span) * 100}%`,
+                  }}
+                />
+                <span
+                  className="interval-point"
+                  style={{ left: `${((row.mu - domain.minimum) / domain.span) * 100}%` }}
+                />
+              </div>
+              <span className="mono interval-value">{low.toFixed(1)}–{high.toFixed(1)}</span>
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
+  );
+}
+
+function IntervalMatrix({
+  rows,
+  tiers,
+}: {
+  rows: RatingRow[];
+  tiers: RatingRow[][];
+}) {
+  const cell = Math.max(7, Math.min(18, Math.floor(480 / Math.max(1, rows.length))));
+  const starts = new Set<number>();
+  let offset = 0;
+  for (const tier of tiers) {
+    starts.add(offset);
+    offset += tier.length;
+  }
+  return (
+    <Panel
+      title="Ordering confidence"
+      action={
+        <div className="matrix-legend" aria-label="Matrix legend">
+          <span><i className="relation-above" /> Above</span>
+          <span><i className="relation-overlap" /> Unresolved</span>
+          <span><i className="relation-below" /> Below</span>
+        </div>
+      }
+    >
+      <div className="relation-wrap">
+        <table className="relation-matrix">
+          <thead>
+            <tr>
+              <th aria-label="Value" />
+              {rows.map((row, index) => (
+                <th style={{ minWidth: cell, height: cell }} key={row.value_id} title={row.name}>{index + 1}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((a, rowIndex) => (
+              <tr className={starts.has(rowIndex) ? "tier-break" : ""} key={a.value_id}>
+                <th><span className="mono">{rowIndex + 1}</span> {a.name}</th>
+                {rows.map((b) => {
+                  const relation = rankRelation(a, b);
+                  return (
+                    <td
+                      className={`relation-${relation}`}
+                      style={{ width: cell, minWidth: cell, height: cell }}
+                      key={b.value_id}
+                      title={`${a.name} vs ${b.name}: ${relation}`}
+                      aria-label={`${a.name} is ${relation} ${b.name}`}
+                    />
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
   );
 }
 
@@ -2695,7 +2846,8 @@ function Reports({ repo, db }: ViewProps) {
         <Empty title="No value set">Import values first.</Empty>
       </Page>
     );
-  const rows = repo.ratings(set.id);
+  const rows = repo.orderedRatings(set.id);
+  const tiers = stableTiers(rows);
   const history = repo.history(set.id);
   const tensions = db.query<{
     id: string;
@@ -2717,6 +2869,7 @@ function Reports({ repo, db }: ViewProps) {
     claims,
     repo.settings(),
   );
+  const html = reportHtml(set, rows, tiers, history, tensions, claims);
   return (
     <Page
       title="Reports"
@@ -2735,7 +2888,13 @@ function Reports({ repo, db }: ViewProps) {
             ))}
           </select>
           <button className="btn no-print" onClick={() => print()}>
-            Print HTML
+            Print
+          </button>
+          <button
+            className="btn no-print"
+            onClick={() => download(`${set.name}.html`, html, "text/html")}
+          >
+            <Download size={14} /> HTML
           </button>
           <button
             className="btn no-print"
@@ -2748,31 +2907,43 @@ function Reports({ repo, db }: ViewProps) {
         </>
       }
     >
-      <article className="panel panel-body report">
-        <h1>{set.name}</h1>
-        <p className="muted">
-          Generated {new Date().toLocaleString()} · Values Tool schema 1
-        </p>
-        <h2>Methodology and settings</h2>
+      <article className="report">
+        <header className="report-cover">
+          <div className="report-kicker">Values profile</div>
+          <h1>{set.name}</h1>
+          <p className="mono muted">{new Date().toLocaleString()}</p>
+        </header>
+        <h2>Stable tiers</h2>
+        <div className="report-tiers">
+          {tiers.map((tier, index) => (
+            <div className="tier-row" key={index}>
+              <div className="tier-label">{index + 1}</div>
+              <div className="tier-values">
+                {tier.map((row) => (
+                  <span key={row.value_id}>
+                    <strong>{row.name}</strong>
+                    <small className="mono">{row.mu.toFixed(1)} ± {row.sigma.toFixed(1)}</small>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <h2>Intervals</h2>
+        <IntervalPlot rows={rows} />
+        <h2>Definitely above or below</h2>
+        <IntervalMatrix rows={rows} tiers={tiers} />
+        <h2>Method</h2>
         <p>
-          Two-player TrueSkill posterior estimates are replayed from the
-          effective immutable event stream. Incomparable, skipped, and malformed
-          choices do not act as draws. Confidence modifiers are{" "}
+          Ratings are replayed from recorded comparisons. Tiers join neighbors
+          whose pairwise ordering is below 90% confidence. Incomparable, skipped,
+          and unclear choices are not treated as draws. Confidence modifiers are{" "}
           {repo.settings().rating.modifiersEnabled
             ? "enabled with bounded observation-noise adjustments"
             : "recorded but disabled for rating updates"}
           .
         </p>
-        <h2>Overall ranking</h2>
-        <ol>
-          {rows.map((row) => (
-            <li key={row.value_id}>
-              <strong>{row.name}</strong> — μ {row.mu.toFixed(2)}, σ{" "}
-              {row.sigma.toFixed(2)}, top evidence {row.comparisons}
-            </li>
-          ))}
-        </ol>
-        <h2>Context-specific differences</h2>
+        <h2>Contexts</h2>
         {repo.contexts().map((context) => (
           <p key={context.id}>
             <strong>{context.name}:</strong>{" "}
@@ -2783,7 +2954,7 @@ function Reports({ repo, db }: ViewProps) {
               .join(", ") || "unresolved"}
           </p>
         ))}
-        <h2>Claims and top-value profiles</h2>
+        <h2>Claims</h2>
         {claims.map((claim) => (
           <p key={claim.id}>
             <span className="badge">
@@ -2792,7 +2963,7 @@ function Reports({ repo, db }: ViewProps) {
             {claim.text} <span className="mono">[{claim.id.slice(0, 8)}]</span>
           </p>
         ))}
-        <h2>Major tensions</h2>
+        <h2>Tensions</h2>
         {tensions.map((tension) => (
           <p key={tension.id}>
             <strong>{tension.title}</strong> ({tension.status}) —{" "}
@@ -2800,13 +2971,7 @@ function Reports({ repo, db }: ViewProps) {
             <span className="mono">[{tension.id.slice(0, 8)}]</span>
           </p>
         ))}
-        <h2>Uncertainty and unresolved questions</h2>
-        <p>
-          Posterior overlap indicates that tiers may be stable even where exact
-          order is not. Context-only rankings with sparse evidence should be
-          interpreted as unresolved.
-        </p>
-        <h2>Appendix of comparisons</h2>
+        <h2>Comparison appendix</h2>
         {history.map((event) => (
           <p className="small" key={event.id}>
             <span className="mono">[{event.id.slice(0, 8)}]</span>{" "}
@@ -2818,6 +2983,56 @@ function Reports({ repo, db }: ViewProps) {
       </article>
     </Page>
   );
+}
+
+const escapeHtml = (value: unknown) =>
+  String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+
+function reportHtml(
+  set: SetRow,
+  rows: RatingRow[],
+  tiers: RatingRow[][],
+  history: EventRow[],
+  tensions: { id: string; title: string; description: string; status: string }[],
+  claims: { id: string; text: string; creation_method: string; status: string }[],
+) {
+  const z = 1.645;
+  const domain = intervalDomain(rows, z);
+  const tierStarts = new Set<number>();
+  let position = 0;
+  for (const tier of tiers) {
+    tierStarts.add(position);
+    position += tier.length;
+  }
+  const tierMarkup = tiers
+    .map(
+      (tier, index) => `<div class="tier"><b>${index + 1}</b><div>${tier
+        .map((row) => `<span>${escapeHtml(row.name)} <small>${row.mu.toFixed(1)} ± ${row.sigma.toFixed(1)}</small></span>`)
+        .join("")}</div></div>`,
+    )
+    .join("");
+  const intervalMarkup = rows
+    .map((row, index) => {
+      const low = row.mu - z * row.sigma;
+      const high = row.mu + z * row.sigma;
+      return `<div class="interval"><code>${index + 1}</code><strong>${escapeHtml(row.name)}</strong><i><u style="left:${((low - domain.minimum) / domain.span) * 100}%;width:${((high - low) / domain.span) * 100}%"></u><em style="left:${((row.mu - domain.minimum) / domain.span) * 100}%"></em></i><code>${low.toFixed(1)}–${high.toFixed(1)}</code></div>`;
+    })
+    .join("");
+  const matrixMarkup = `<table class="matrix"><thead><tr><th></th>${rows.map((_, index) => `<th>${index + 1}</th>`).join("")}</tr></thead><tbody>${rows
+    .map(
+      (a, rowIndex) => `<tr class="${tierStarts.has(rowIndex) ? "break" : ""}"><th>${rowIndex + 1} ${escapeHtml(a.name)}</th>${rows
+        .map((b) => `<td class="${rankRelation(a, b)}" title="${escapeHtml(a.name)} / ${escapeHtml(b.name)}"></td>`)
+        .join("")}</tr>`,
+    )
+    .join("")}</tbody></table>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${escapeHtml(set.name)} · values report</title><style>
+  :root{--ink:#111315;--muted:#657079;--rule:#d9dee2;--blue:#2455ff;--green:#14805e;--amber:#d99000;--red:#cb4b41}*{box-sizing:border-box}body{margin:0;color:var(--ink);font:14px/1.4 Arial,sans-serif}main{max-width:1200px;margin:auto;padding:48px}header{border-top:8px solid var(--ink);padding:24px 0 34px}h1{font-size:42px;margin:0}h2{font-size:18px;margin:44px 0 14px;border-bottom:2px solid var(--ink);padding-bottom:8px}code,small{font-family:ui-monospace,monospace;color:var(--muted)}.tier{display:grid;grid-template-columns:54px 1fr;border-top:1px solid var(--rule)}.tier>b{font-size:24px;padding:14px}.tier>div{display:flex;flex-wrap:wrap;gap:8px;padding:12px}.tier span{border:1px solid var(--rule);padding:6px 8px}.tier small{margin-left:6px}.interval{display:grid;grid-template-columns:28px 170px 1fr 86px;gap:10px;align-items:center;min-height:30px}.interval i{height:12px;position:relative;background:#f0f2f4}.interval u{position:absolute;top:3px;height:6px;background:#aab8ff;text-decoration:none}.interval em{position:absolute;top:0;width:2px;height:12px;background:var(--blue)}.legend{display:flex;gap:16px;margin:8px 0}.legend i{width:12px;height:12px;display:inline-block;margin-right:4px}.matrix{border-collapse:collapse;font-size:9px}.matrix th{height:13px;min-width:11px;font-weight:400}.matrix tbody th{text-align:right;padding-right:7px;white-space:nowrap;max-width:150px;overflow:hidden}.matrix td{width:11px;height:11px;border:1px solid white}.matrix .above,.legend .above{background:var(--green)}.matrix .below,.legend .below{background:#cbd2d7}.matrix .overlap,.legend .overlap{background:var(--amber)}.matrix .same{background:var(--ink)}.matrix tr.break td,.matrix tr.break th{border-top:2px solid var(--ink)}.records p{margin:5px 0}@media print{@page{size:landscape;margin:10mm}main{padding:0}.matrix{font-size:7px}.matrix td{width:8px;height:8px}}
+  </style></head><body><main><header><small>VALUES PROFILE · ${new Date().toISOString()}</small><h1>${escapeHtml(set.name)}</h1></header><h2>Stable tiers</h2>${tierMarkup}<h2>90% credible intervals</h2>${intervalMarkup}<h2>Definitely above or below</h2><div class="legend"><span><i class="above"></i>above</span><span><i class="overlap"></i>unresolved</span><span><i class="below"></i>below</span></div>${matrixMarkup}<h2>Claims</h2>${claims.map((claim) => `<p><small>${escapeHtml(claim.creation_method)} · ${escapeHtml(claim.status)} · ${escapeHtml(claim.id.slice(0, 8))}</small><br>${escapeHtml(claim.text)}</p>`).join("") || "<p>None recorded.</p>"}<h2>Tensions</h2>${tensions.map((tension) => `<p><strong>${escapeHtml(tension.title)}</strong> · ${escapeHtml(tension.description)} <small>${escapeHtml(tension.id.slice(0, 8))}</small></p>`).join("") || "<p>None recorded.</p>"}<h2>Comparison appendix</h2><div class="records">${history.map((event) => `<p><small>${escapeHtml(event.id.slice(0, 8))}</small> ${escapeHtml(event.left_name)} / ${escapeHtml(event.right_name)} · ${escapeHtml(event.result)}</p>`).join("")}</div></main></body></html>`;
 }
 function reportMarkdown(
   set: SetRow,
@@ -2847,8 +3062,8 @@ function DataView({ repo, db, mutate }: ViewProps) {
   ];
   return (
     <Page
-      title="Imports & exports"
-      description="Complete SQLite-backed backups, atomic restore, documented value-set imports, and normalized CSV analysis files."
+      title="Data"
+      description="Back up, restore, import, and export your work."
     >
       {message && (
         <div className="notice">
@@ -2915,13 +3130,8 @@ function DataView({ repo, db, mutate }: ViewProps) {
           <Panel title="Import value set JSON or CSV">
             <ImportSet repo={repo} mutate={mutate} />
           </Panel>
-          <Panel title="Portable SQLite">
-            <p>
-              The browser deployment runs the generated SQLite schema in a
-              bundled WASM engine. Database bytes are stored in IndexedDB after
-              every transaction and survive page reloads without a server,
-              account, or external API.
-            </p>
+          <Panel title="Your data">
+            <p>Saved on this device. Export a backup before clearing browser data.</p>
           </Panel>
         </div>
       </div>

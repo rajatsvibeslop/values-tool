@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne } from "drizzle-orm";
 import { db, getPreset, getSettings } from "./index";
 import * as s from "./schema";
-import { initialRating, type Rating, type RatingEvent } from "@/domain/types";
+import type { Rating, RatingEvent } from "@/domain/types";
 import { effectiveEvents, replayRatings } from "@/domain/rating";
-import { selectMatches } from "@/domain/matchmaking";
+import { balancedSides } from "@/domain/matchmaking";
+import { exactRankingProgress, toExactDecisions } from "@/domain/exact-ranking";
 import { detectTensions } from "@/domain/tensions";
 
 export function listValueSets() {
@@ -24,10 +25,10 @@ export function valuesForSet(valueSetId: string, includeArchived = false) {
 export function importPreset(slug: string): string {
   const presetRow = getPreset(slug);
   if (!presetRow) throw new Error("Preset not found");
-  const preset = presetRow.data as { name: string; description: string; taxonomy: string; citation: string; values: { id: string; name: string; definition: string; category: string }[] };
+  const preset = presetRow.data as { name: string; description: string; taxonomy: string; citation: string; licenseNote?: string; sourceUrl?: string; values: { id: string; name: string; definition: string; category: string }[] };
   const id = randomUUID(); const now = new Date();
   db.transaction((tx) => {
-    tx.insert(s.valueSets).values({ id, name: preset.name, description: preset.description, sourceType: "preset", sourceMetadata: { preset: slug, citation: preset.citation }, archived: false, createdAt: now, updatedAt: now }).run();
+    tx.insert(s.valueSets).values({ id, name: preset.name, description: preset.description, sourceType: "preset", sourceMetadata: { preset: slug, citation: preset.citation, licenseNote: preset.licenseNote, sourceUrl: preset.sourceUrl }, archived: false, createdAt: now, updatedAt: now }).run();
     preset.values.forEach((item, sortOrder) => {
       const valueId = randomUUID();
       tx.insert(s.values).values({ id: valueId, name: item.name, shortDefinition: item.definition, sourceDefinition: item.definition, personalDefinition: "", sourceTaxonomy: preset.taxonomy, sourceIdentifier: item.id, parentCategory: item.category, tags: [], active: true, createdAt: now, updatedAt: now }).run();
@@ -115,16 +116,39 @@ export function createSnapshot(valueSetId: string, reason: string, eventId?: str
 
 export function rankings(valueSetId: string, scopeKey = "global") {
   const values = valuesForSet(valueSetId, true); const rows = db.select().from(s.ratings).where(and(eq(s.ratings.valueSetId, valueSetId), eq(s.ratings.scopeKey, scopeKey))).all();
-  return rows.map((rating) => ({ ...rating, value: values.find((value) => value.id === rating.valueId)! })).filter((row) => row.value).sort((a, b) => b.mu - a.mu || a.value.name.localeCompare(b.value.name));
+  const exact = db.select().from(s.applicationSettings).where(eq(s.applicationSettings.key, `exact-ranking:${valueSetId}:${scopeKey}`)).get()?.value as { complete?: boolean; ordered?: string[] } | undefined;
+  const rank = new Map(exact?.complete ? exact.ordered?.map((id, index) => [id, index]) : []);
+  return rows.map((rating) => ({ ...rating, value: values.find((value) => value.id === rating.valueId)! })).filter((row) => row.value).sort((a, b) => exact?.complete ? (rank.get(a.valueId) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b.valueId) ?? Number.MAX_SAFE_INTEGER) : b.mu - a.mu || a.value.name.localeCompare(b.value.name));
 }
 
-export function regenerateQueue(sessionId: string, count = 20): void {
+export function regenerateQueue(sessionId: string): void {
   const session = db.select().from(s.comparisonSessions).where(eq(s.comparisonSessions.id, sessionId)).get(); if (!session) throw new Error("Session not found");
-  const settings = getSettings(); const values = valuesForSet(session.valueSetId); const ratingRows = rankings(session.valueSetId);
-  const candidates = selectMatches({ values: values.map((value) => ({ id: value.id, name: value.name, parentCategory: value.parentCategory, aliases: value.aliases, rating: ratingRows.find((row) => row.valueId === value.id) ?? initialRating(settings.rating) })), events: ratingEventsForSet(session.valueSetId), config: settings.rating, weights: settings.selection, topK: settings.convergence.topK, minimumCoverage: settings.convergence.minimumComparisons, count });
+  const values = valuesForSet(session.valueSetId);
+  const contextIds = db.select().from(s.sessionContexts).where(eq(s.sessionContexts.sessionId, sessionId)).all().map((row) => row.contextId).sort();
+  const scope = contextIds.length === 0 ? "global" : contextIds.length === 1 ? `context:${contextIds[0]}` : `contexts:${contextIds.join("+")}`;
+  const relevant = effectiveEvents(ratingEventsForSet(session.valueSetId)).filter((event) => !contextIds.length || contextIds.every((id) => event.contextIds.includes(id)));
+  const byPair = new Map<string, (RatingEvent & { sessionId?: string })[]>();
+  for (const event of relevant) {
+    const key = [event.leftValueId, event.rightValueId].sort().join(":");
+    byPair.set(key, [...(byPair.get(key) ?? []), event]);
+  }
+  const decisions = [...byPair.values()].flatMap((events) => {
+    const latest = events.filter((event) => event.sessionId === sessionId).at(-1);
+    if (latest) return toExactDecisions([latest]);
+    const outcomes = new Set(events.map((event) => event.result === "tie" ? "tie" : event.result === "left" ? event.leftValueId : event.result === "right" ? event.rightValueId : event.result));
+    return outcomes.size === 1 ? toExactDecisions([events.at(-1)!]) : [];
+  });
+  const progress = exactRankingProgress({ valueIds: values.map((value) => value.id), seed: `${session.valueSetId}:${scope}`, decisions });
+  const candidate = progress.nextPair ? balancedSides({ ...progress.nextPair, reason: `Exact ordering · ${progress.placed}/${progress.total} placed`, score: progress.worstCase - progress.reusedComparisons, details: ["Binary search of the remaining insertion interval"] }, `${sessionId}:${session.completedCount}`) : null;
+  const afterSnapshotId = candidate ? session.afterSnapshotId : createSnapshot(session.valueSetId, "exact-order-complete");
   db.transaction((tx) => {
-    tx.delete(s.comparisonQueue).where(eq(s.comparisonQueue.sessionId, sessionId)).run();
-    candidates.forEach((candidate, position) => tx.insert(s.comparisonQueue).values({ id: randomUUID(), sessionId, leftValueId: candidate.leftValueId, rightValueId: candidate.rightValueId, reason: candidate.reason, score: candidate.score, position, createdAt: new Date() }).run());
+    tx.delete(s.comparisonQueue).where(and(eq(s.comparisonQueue.sessionId, sessionId), ne(s.comparisonQueue.reason, "Manual comparison"))).run();
+    if (candidate) tx.insert(s.comparisonQueue).values({ id: randomUUID(), sessionId, leftValueId: candidate.leftValueId, rightValueId: candidate.rightValueId, reason: candidate.reason, score: candidate.score, position: 0, createdAt: new Date() }).run();
+    else {
+      const stored = { ...progress, sessionId, scope, updatedAt: Date.now() };
+      tx.insert(s.applicationSettings).values({ key: `exact-ranking:${session.valueSetId}:${scope}`, value: stored, updatedAt: new Date() }).onConflictDoUpdate({ target: s.applicationSettings.key, set: { value: stored, updatedAt: new Date() } }).run();
+      tx.update(s.comparisonSessions).set({ status: "completed", endedAt: new Date(), afterSnapshotId, updatedAt: new Date() }).where(eq(s.comparisonSessions.id, sessionId)).run();
+    }
   });
 }
 

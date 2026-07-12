@@ -122,7 +122,7 @@ export async function submitComparisonAction(form: FormData) {
     tx.delete(s.comparisonQueue).where(and(eq(s.comparisonQueue.sessionId, input.sessionId), eq(s.comparisonQueue.leftValueId, input.leftValueId), eq(s.comparisonQueue.rightValueId, input.rightValueId))).run();
   });
   recomputeRatings(input.valueSetId); createSnapshot(input.valueSetId, "after-comparison", id); refreshTensionSuggestions(input.valueSetId);
-  if (db.select().from(s.comparisonQueue).where(eq(s.comparisonQueue.sessionId, input.sessionId)).all().length < 5) regenerateQueue(input.sessionId);
+  regenerateQueue(input.sessionId);
   revalidatePath("/");
 }
 
