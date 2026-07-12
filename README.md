@@ -1,6 +1,6 @@
 # Values Tool
 
-Values Tool is a local-first analytical application for ranking personal values through strategic pairwise comparisons. A finite exact-order scheduler establishes a stable ordering efficiently; a two-player TrueSkill-style Bayesian model retains uncertainty, tiers, and context dependence. Every decision can preserve the user's original reasoning as evidence.
+Values Tool is a local-first analytical application for ranking personal values through adaptive pairwise and five-value questions. Rapid sessions rank five values at once; an optional finite pairwise scheduler remains available for exact ordering. A TrueSkill-style Bayesian model retains uncertainty, tiers, and context dependence. Every decision can preserve the user's original reasoning as evidence.
 
 The application has two delivery adapters:
 
@@ -93,9 +93,48 @@ Three explicit scopes are maintained:
 
 The ranking UI always labels the scope. Context-only results with sparse evidence remain visibly uncertain.
 
+## Rapid Five-Value Ranking
+
+Rapid ranking is the default session method. Each question presents five adaptively
+selected values and asks the user to arrange them from most to least important. A
+five-value order contains substantially more information than a binary choice:
+
+- A 100-value session has a fixed budget of 80 questions.
+- Selection balances sparse coverage, posterior uncertainty, similar estimated strength,
+  novel pair coverage, and category diversity.
+- One answer becomes four adjacent immutable events. These relations fully encode the
+  local order through transitivity without treating all ten correlated pairs as ten
+  independent observations.
+- A stable synthetic 100-value preference recovers a rank correlation above 0.9 within
+  the budget in the automated domain test.
+- Completion means the rapid pass is finished, not that every adjacent relation is
+  certain. Tiers, intervals, and the relation matrix expose remaining ambiguity.
+
+This design follows the result that ranked top-m feedback from subset-wise questions can
+reduce sample complexity relative to pairwise feedback. See Saha and Gopalan,
+[*Active Ranking with Subset-wise Preferences*](https://proceedings.mlr.press/v89/saha19a.html).
+
+## Automatic Scenarios
+
+Every rapid question receives a scenario automatically. Configure the generator in
+**Settings > Decision scenarios**:
+
+- **On-device:** always available; composes a decision frame from the current value
+  definitions and context without a network request.
+- **OpenRouter Free:** uses `openrouter/free`, which routes to a currently available free
+  model. It requires an OpenRouter key and is subject to free-tier availability and rate
+  limits.
+- **DeepSeek V4 Flash:** uses the OpenAI-compatible DeepSeek API and defaults to
+  `deepseek-v4-flash`.
+
+Hosted prompts contain only the five displayed names, definitions, selected contexts,
+and session purpose. API keys are kept in `sessionStorage`, are removed when the tab is
+closed, and never enter SQLite, backups, exports, or share links. The generated scenario,
+provider, and model are preserved as evidence with the answer.
+
 ## Exact Ordering and Adaptive Verification
 
-The canonical browser experience uses `src/domain/exact-ranking.ts` to schedule a
+Pairwise exact mode uses `src/domain/exact-ranking.ts` to schedule a
 deterministic binary-insertion order. This is a finite process rather than a queue that
 silently replenishes:
 
@@ -113,9 +152,6 @@ adjacent boundaries worth retesting. This concentrates repeated sampling where i
 change the order instead of spending comparisons on distant, already settled pairs.
 The research and assumptions are documented in
 [`docs/ranking-strategy.md`](docs/ranking-strategy.md).
-
-The reusable selector in `src/domain/matchmaking.ts` remains available for exploratory
-and verification work. It scores eligible pairs using configurable components:
 
 `src/domain/matchmaking.ts` scores every eligible pair using configurable, inspectable components:
 
@@ -152,6 +188,14 @@ tensions.csv               tension_sources.csv
 ```
 
 Reports export as Markdown, self-contained HTML, or print. The HTML report starts with a stable tier list, a 90% credible-interval plot, and a pairwise relation matrix that distinguishes definitely above, definitely below, and unresolved overlap. It also labels statistical inference, source statements, rule-based aggregation, manual interpretation, and draft synthesis.
+
+## Resetting Evidence
+
+**Settings > Reset ranking evidence** supports transactional reset for one value set or
+all value sets. Reset removes comparisons, sessions, ratings, snapshots, manual tiers,
+claims, and tensions while preserving value-set membership, values, definitions, aliases,
+and definition history. Each destructive action requires typing the displayed confirmation
+phrase. Export a complete backup first when the evidence may be needed later.
 
 ## Presets
 

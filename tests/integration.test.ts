@@ -57,6 +57,53 @@ describe("browser repository integration", () => {
     ]);
   });
 
+  it("records a five-value rapid question as one question and four adjacent events", async () => {
+    const setId = await repo.importPreset("editable-card-sort");
+    const sessionId = await repo.startSession(setId, "Rapid ranking", [], "rapid");
+    const question = repo.rapidQuestion(sessionId)!;
+    expect(question.valueIds).toHaveLength(5);
+    expect(question.budget).toBe(16);
+    await repo.submitRapidRanking({
+      sessionId,
+      setId,
+      orderedValueIds: question.valueIds,
+      contexts: [],
+      reasoning: "This order best fits the scenario.",
+    });
+    expect(repo.sessions().find((session) => session.id === sessionId)?.completed_count).toBe(1);
+    expect(repo.history(setId)).toHaveLength(4);
+    expect(repo.rapidQuestion(sessionId)?.question).toBe(2);
+    expect(repo.queue(sessionId)).toHaveLength(1);
+  });
+
+  it("resets one value set's evidence without deleting its values", async () => {
+    const setId = await repo.importPreset("schwartz-10");
+    const sessionId = await repo.startSession(setId, "Reset me", []);
+    const pair = repo.queue(sessionId)[0]!;
+    await repo.submit({ sessionId, setId, leftId: pair.left_value_id, rightId: pair.right_value_id, result: "left", strength: "moderate", confidence: "confident", contexts: [], reasoning: "", winner: "", loser: "", reversal: "" });
+    expect(repo.history(setId)).toHaveLength(1);
+    await repo.resetEvidence(setId);
+    expect(repo.values(setId)).toHaveLength(10);
+    expect(repo.history(setId)).toHaveLength(0);
+    expect(repo.sessions().filter((session) => session.value_set_id === setId)).toHaveLength(0);
+    expect(repo.ratings(setId).every((rating) => rating.comparisons === 0)).toBe(true);
+  });
+
+  it("resets evidence across every value set in one operation", async () => {
+    const firstSet = await repo.importPreset("schwartz-10");
+    const secondSet = await repo.importPreset("rokeach-terminal");
+    for (const setId of [firstSet, secondSet]) {
+      const sessionId = await repo.startSession(setId, "Reset all", []);
+      const pair = repo.queue(sessionId)[0]!;
+      await repo.submit({ sessionId, setId, leftId: pair.left_value_id, rightId: pair.right_value_id, result: "left", strength: "moderate", confidence: "confident", contexts: [], reasoning: "", winner: "", loser: "", reversal: "" });
+    }
+    expect(repo.history()).toHaveLength(2);
+    await repo.resetEvidence();
+    expect(repo.sets()).toHaveLength(2);
+    expect(repo.history()).toHaveLength(0);
+    expect(repo.sessions()).toHaveLength(0);
+  });
+
   it("edits a definition, creates an evidence claim, and retains revision history", async () => {
     const setId = await repo.importPreset("schwartz-10"); const value = repo.values(setId)[0]!; await repo.updateValue(value.id, { name: value.name, definition: "My revised personal definition", category: value.parent_category });
     expect(database.query("SELECT * FROM definition_revisions WHERE value_id=?", [value.id])).toHaveLength(2); expect(database.query("SELECT * FROM audit_events WHERE entity_id=?", [value.id])).toHaveLength(1);

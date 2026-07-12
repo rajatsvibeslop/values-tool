@@ -13,6 +13,7 @@ test("imports values, completes comparisons, and inspects rankings and history",
   await expect(page.getByText("Current top values")).toBeVisible();
 
   await page.locator('a[href="#compare"]').first().click();
+  await page.getByLabel("Method").selectOption("exact");
   await page.getByLabel("Session name").fill("E2E priorities");
   await page.getByRole("button", { name: "Start session" }).click();
   await expect(page.getByText("1/20 placed", { exact: true })).toBeVisible();
@@ -65,7 +66,10 @@ test("starts a new session directly from a preset", async ({ page }) => {
   await page.getByLabel("Session name").fill("Preset session");
   await page.getByRole("button", { name: "Start session" }).click();
   await expect(page.getByRole("heading", { name: "Preset session" })).toBeVisible();
-  await expect(page.getByText("1/10 placed", { exact: true })).toBeVisible();
+  await expect(page.getByText("1/8", { exact: true })).toBeVisible();
+  await expect(page.locator(".rapid-rank-row")).toHaveCount(5);
+  await page.getByRole("button", { name: "Use this order" }).click();
+  await expect(page.getByText("2/8", { exact: true })).toBeVisible();
 });
 
 test("shares a read-only ranking snapshot by URL", async ({ page, browser }, testInfo) => {
@@ -90,6 +94,7 @@ test("supports keyboard decisions and mobile navigation", async ({ page }, testI
   const card = page.locator(".preset-row").filter({ hasText: "Editable values card sort" });
   await card.getByRole("button", { name: "Use set" }).click();
   await page.locator('a[href="#compare"]').first().click();
+  await page.getByLabel("Method").selectOption("exact");
   await page.getByLabel("Session name").fill("Mobile session");
   await page.getByRole("button", { name: "Start session" }).click();
   await expect(page.getByRole("button", { name: /Left wins/ })).toBeVisible();
@@ -118,4 +123,44 @@ test("exports a self-contained HTML tier report", async ({ page }, testInfo) => 
   await page.getByRole("button", { name: "HTML" }).click();
   const report = await downloadPromise;
   expect(report.suggestedFilename()).toMatch(/\.html$/);
+});
+
+test("stores hosted scenario credentials only for the browser tab", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "One settings check is sufficient");
+  await page.locator('a[href="#settings"]').first().click();
+  await page.getByLabel("Generator").selectOption("openrouter");
+  await page.getByLabel(/API key/).fill("test-session-key");
+  await page.getByLabel("Model").fill("openrouter/free");
+  await page.locator(".panel").filter({ has: page.getByRole("heading", { name: "Decision scenarios" }) }).getByRole("button", { name: "Save", exact: true }).click();
+  expect(await page.evaluate(() => sessionStorage.getItem("scenario-api-key"))).toBe("test-session-key");
+  expect(await page.evaluate(() => localStorage.getItem("scenario-provider"))).toBe("openrouter");
+  await page.route("https://openrouter.ai/api/v1/chat/completions", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({ scenario: "You must choose between a secure familiar role and a risky opportunity to build something meaningful with people you trust." }) } }] }),
+    }),
+  );
+  await page.locator('a[href="#compare"]').first().click();
+  await page.getByLabel("Value set").selectOption("preset:schwartz-10");
+  await page.getByLabel("Session name").fill("Generated scenarios");
+  await page.getByRole("button", { name: "Start session" }).click();
+  await expect(page.getByText(/secure familiar role/)).toBeVisible();
+});
+
+test("resets ranking evidence while preserving the value set", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "One destructive-flow check is sufficient");
+  await page.locator(".preset-row").filter({ hasText: "Schwartz 10 broad basic values" }).getByRole("button", { name: "Use set" }).click();
+  await page.locator('a[href="#compare"]').first().click();
+  await page.getByLabel("Method").selectOption("exact");
+  await page.getByLabel("Session name").fill("Evidence to reset");
+  await page.getByRole("button", { name: "Start session" }).click();
+  await page.getByRole("button", { name: /Left wins/ }).click();
+  await page.locator('a[href="#settings"]').first().click();
+  await page.getByLabel("Type RESET Schwartz 10 broad basic values").fill("RESET Schwartz 10 broad basic values");
+  await page.getByRole("button", { name: "Reset this value set" }).click();
+  await page.locator('a[href="#history"]').first().click();
+  await expect(page.getByText("0 comparison events")).toBeVisible();
+  await page.locator('a[href="#values"]').first().click();
+  await expect(page.getByText("Schwartz 10 broad basic values").first()).toBeVisible();
 });

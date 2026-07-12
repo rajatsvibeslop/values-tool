@@ -28,6 +28,9 @@
 - [x] Broad 100 and public-domain Miller card-sort presets
 - [x] Tier-first ranking/report views with interval plots and relation matrices
 - [x] Committed Swiss instrument visual system and bundled typography
+- [x] Rapid five-value ranking sessions with a sub-100-question budget
+- [x] Automatic scenario generation with local, OpenRouter Free, and DeepSeek providers
+- [x] Transactional evidence reset for one value set or the full workspace
 
 ## Key Decisions
 
@@ -54,6 +57,14 @@
 8. **Unresolved relations:** Ties remain tier relations; incomparable, skipped, and
    malformed answers do not become wins or draws. Exact-order progress is explicitly
    separated from Bayesian convergence.
+9. **Rapid ranking:** Five-value questions capture a complete local ordering as four
+   adjacent immutable events. This avoids treating the ten correlated pair relations as
+   ten independent observations. The 100-value default uses 80 adaptive questions and
+   reports remaining uncertainty rather than claiming guaranteed exactness.
+10. **Scenario providers:** Scenarios are generated from the current values, definitions,
+    context, and question purpose. Definition-derived generation is always available;
+    optional OpenAI-compatible providers use session-only credentials that are excluded
+    from exports and durable storage.
 
 ## Verification Gates
 

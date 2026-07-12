@@ -8,6 +8,12 @@ queue. A binary answer contains at most one bit. There are `n!` possible complet
 orders, so any method needs at least `ceil(log2(n!))` answers in the worst case. For 100
 values that lower bound is 525.
 
+The default product target is instead a high-quality inferred order in fewer than 100
+questions. Rapid sessions ask the user to fully order five values. Since one such answer
+has up to `log2(5!)` = 6.9 bits, the information floor for 100 distinct values is 76
+five-value questions. The application uses a fixed budget of 80 and retains uncertainty
+rather than claiming a worst-case exact guarantee.
+
 The application therefore uses a deterministic binary-insertion scheduler for exact
 ordering sessions. Its worst case for 100 values is 573 decisive comparisons. It is
 resumable, replays deterministically, uses a seeded starting order to avoid alphabetical
@@ -24,11 +30,16 @@ Sources:
   2017): https://proceedings.mlr.press/v70/falahatgar17a.html
 - Heckel et al., *Approximate Ranking from Pairwise Comparisons* (AISTATS 2018):
   https://proceedings.mlr.press/v84/heckel18a.html
+- Saha and Gopalan, *Active Ranking with Subset-wise Preferences* (AISTATS 2019):
+  https://proceedings.mlr.press/v89/saha19a.html
 
 ## Division of responsibility
 
 - **Exact-order scheduler:** establishes a finite partial or total order with as few new
   questions as practical under the stable-preference assumption.
+- **Rapid scheduler:** selects five-value subsets for sparse coverage, uncertainty,
+  boundary resolution, novel relations, and category diversity. A full answer is encoded
+  as four adjacent relations, not ten falsely independent pairwise observations.
 - **TrueSkill:** estimates latent strength and posterior uncertainty, including sparse
   contextual rankings.
 - **Verification:** targets adjacent boundaries with weak posterior separation,

@@ -7,6 +7,12 @@ import {
 import { replayRatings, effectiveEvents } from "@/domain/rating";
 import { detectTensions, type TensionSuggestion } from "@/domain/tensions";
 import type { Rating, RatingEvent } from "@/domain/types";
+import {
+  adjacentDecisions,
+  rapidQuestionBudget,
+  selectRapidGroup,
+} from "@/domain/rapid-ranking";
+import { deriveScenario, type GeneratedScenario } from "@/domain/scenarios";
 import { DEFAULT_SETTINGS } from "@/db/defaults";
 import type { BrowserDatabase } from "./database";
 import schwartz10 from "../../data/presets/schwartz-10.json";
@@ -126,6 +132,16 @@ export interface StoredExactRanking extends ExactRankingProgress {
   updatedAt: number;
 }
 
+export interface RapidQuestion {
+  id: string;
+  sessionId: string;
+  valueIds: string[];
+  reason: string;
+  question: number;
+  budget: number;
+  scenario: GeneratedScenario;
+}
+
 export class BrowserRepository {
   constructor(readonly db: BrowserDatabase) {}
 
@@ -185,6 +201,38 @@ export class BrowserRepository {
     return this.db.query<QueueRow>(
       "SELECT * FROM comparison_queue WHERE session_id=? ORDER BY position",
       [sessionId],
+    );
+  }
+
+  sessionMode(sessionId: string): "exact" | "rapid" {
+    const row = this.db.one<{ value: string }>(
+      "SELECT value FROM application_settings WHERE key=?",
+      [`session-mode:${sessionId}`],
+    );
+    return row && parsed<"exact" | "rapid">(row.value, "exact") === "rapid"
+      ? "rapid"
+      : "exact";
+  }
+
+  rapidQuestion(sessionId: string): RapidQuestion | null {
+    const row = this.db.one<{ value: string }>(
+      "SELECT value FROM application_settings WHERE key=?",
+      [`rapid-question:${sessionId}`],
+    );
+    return row ? parsed<RapidQuestion | null>(row.value, null) : null;
+  }
+
+  async updateRapidScenario(
+    sessionId: string,
+    scenario: GeneratedScenario,
+  ): Promise<void> {
+    const question = this.rapidQuestion(sessionId);
+    if (!question) throw new Error("Rapid question not found");
+    await this.db.transaction(() =>
+      this.db.run(
+        "UPDATE application_settings SET value=?,updated_at=? WHERE key=?",
+        [json({ ...question, scenario }), now(), `rapid-question:${sessionId}`],
+      ),
     );
   }
 
@@ -278,6 +326,18 @@ export class BrowserRepository {
       [`exact-ranking:${setId}:${scope}`],
     );
     return row ? parsed<StoredExactRanking | null>(row.value, null) : null;
+  }
+
+  rapidRanking(setId: string, scope = "global"):
+    | { complete: boolean; questions: number; budget: number; sessionId: string }
+    | null {
+    const row = this.db.one<{ value: string }>(
+      "SELECT value FROM application_settings WHERE key=?",
+      [`rapid-ranking:${setId}:${scope}`],
+    );
+    return row
+      ? parsed<{ complete: boolean; questions: number; budget: number; sessionId: string } | null>(row.value, null)
+      : null;
   }
 
   orderedRatings(setId: string, scope = "global"): RatingRow[] {
@@ -746,6 +806,7 @@ export class BrowserRepository {
     setId: string,
     name: string,
     contextIds: string[],
+    mode: "exact" | "rapid" = "exact",
   ): Promise<string> {
     const id = uid();
     const stamp = now();
@@ -756,7 +817,7 @@ export class BrowserRepository {
         [
           id,
           name,
-          "Exact ordering session",
+          mode === "rapid" ? "Rapid five-value ranking" : "Exact ordering session",
           setId,
           "active",
           stamp,
@@ -775,6 +836,10 @@ export class BrowserRepository {
           contextId,
         ]),
       );
+      this.db.run(
+        "INSERT INTO application_settings(key,value,updated_at) VALUES (?,?,?)",
+        [`session-mode:${id}`, json(mode), stamp],
+      );
     });
     await this.regenerateQueue(id);
     return id;
@@ -786,6 +851,10 @@ export class BrowserRepository {
       [sessionId],
     );
     if (!session) throw new Error("Session not found");
+    if (this.sessionMode(sessionId) === "rapid") {
+      await this.regenerateRapidQueue(session);
+      return;
+    }
     const progress = this.exactProgress(sessionId);
     if (!progress) throw new Error("Unable to calculate ordering progress");
     const candidate = progress.nextPair
@@ -833,6 +902,151 @@ export class BrowserRepository {
         );
       }
     });
+  }
+
+  private async regenerateRapidQueue(session: SessionRow): Promise<void> {
+    const values = this.values(session.value_set_id);
+    const settings = this.settings();
+    const ratings = this.ratings(session.value_set_id);
+    const contexts = this.sessionContexts(session.id);
+    const relevantEvents = effectiveEvents(this.events(session.value_set_id)).filter(
+      (event) => !contexts.length || contexts.every((id) => event.contextIds.includes(id)),
+    );
+    const group = selectRapidGroup({
+      values: values.map((value) => ({
+        id: value.id,
+        name: value.name,
+        parentCategory: value.parent_category,
+        aliases: value.aliases ?? [],
+        rating:
+          ratings.find((rating) => rating.value_id === value.id) ?? {
+            mu: settings.rating.mu,
+            sigma: settings.rating.sigma,
+            comparisons: 0,
+            wins: 0,
+            losses: 0,
+            ties: 0,
+            incomparable: 0,
+            lastComparedAt: null,
+          },
+      })),
+      events: relevantEvents,
+      seed: `${session.value_set_id}:${this.exactScope(session.id)}`,
+      completedQuestions: session.completed_count,
+    });
+    const stamp = now();
+    if (!group) {
+      await this.db.transaction(() => {
+        this.db.run("DELETE FROM comparison_queue WHERE session_id=?", [session.id]);
+        this.db.run("DELETE FROM application_settings WHERE key=?", [
+          `rapid-question:${session.id}`,
+        ]);
+        const scope = this.exactScope(session.id);
+        this.db.run(
+          "INSERT INTO application_settings(key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at",
+          [
+            `rapid-ranking:${session.value_set_id}:${scope}`,
+            json({ complete: true, questions: session.completed_count, budget: rapidQuestionBudget(values.length), sessionId: session.id }),
+            stamp,
+          ],
+        );
+        this.db.run(
+          "UPDATE comparison_sessions SET status='completed',ended_at=?,after_snapshot_id=?,updated_at=? WHERE id=?",
+          [stamp, this.snapshot(session.value_set_id, "rapid-ranking-complete", null), stamp, session.id],
+        );
+      });
+      return;
+    }
+    const groupValues = group.valueIds.map((id) => values.find((value) => value.id === id)!);
+    const contextNames = this.contexts()
+      .filter((context) => contexts.includes(context.id))
+      .map((context) => context.name);
+    const question: RapidQuestion = {
+      ...group,
+      sessionId: session.id,
+      scenario: deriveScenario({
+        values: groupValues.map((value) => ({
+          name: value.name,
+          definition: value.personal_definition || value.short_definition,
+          category: value.parent_category,
+        })),
+        contexts: contextNames,
+        purpose: session.name,
+        question: group.question,
+      }),
+    };
+    await this.db.transaction(() => {
+      this.db.run("DELETE FROM comparison_queue WHERE session_id=?", [session.id]);
+      this.db.run(
+        "INSERT INTO comparison_queue VALUES (?,?,?,?,?,?,?,?)",
+        [uid(), session.id, group.valueIds[0], group.valueIds[1], `Rapid ranking · ${group.question}/${group.budget}`, 0, 0, stamp],
+      );
+      this.db.run(
+        "INSERT INTO application_settings(key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at",
+        [`rapid-question:${session.id}`, json(question), stamp],
+      );
+    });
+  }
+
+  async submitRapidRanking(input: {
+    sessionId: string;
+    setId: string;
+    orderedValueIds: string[];
+    contexts: string[];
+    reasoning?: string;
+  }): Promise<void> {
+    const question = this.rapidQuestion(input.sessionId);
+    if (!question) throw new Error("Rapid question not found");
+    if (
+      input.orderedValueIds.length !== question.valueIds.length ||
+      [...input.orderedValueIds].sort().join(":") !== [...question.valueIds].sort().join(":")
+    )
+      throw new Error("The submitted order does not match the active question");
+    const decisions = adjacentDecisions(input.orderedValueIds);
+    const eventIds = decisions.map(() => uid());
+    const stamp = now();
+    await this.db.transaction(() => {
+      this.snapshot(input.setId, "before-rapid-question", null);
+      decisions.forEach((decision, index) => {
+        const eventId = eventIds[index]!;
+        this.db.run(
+          "INSERT INTO comparison_events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          [
+            eventId, input.sessionId, input.setId, decision.leftValueId,
+            decision.rightValueId, "left", "moderate", "confident", "intrinsic",
+            json(["multiway"]), json(eventIds.filter((id) => id !== eventId)),
+            null, "", 0, `rapid-ranking:${question.id}:${index + 1}/${decisions.length}`,
+            1, stamp + index, stamp + index,
+          ],
+        );
+        input.contexts.forEach((contextId) =>
+          this.db.run("INSERT INTO comparison_event_contexts VALUES (?,?)", [eventId, contextId]),
+        );
+        if (index === 0) {
+          this.db.run("INSERT INTO comparison_notes VALUES (?,?,?,?,?)", [
+            uid(), eventId, "general",
+            `Scenario [${question.scenario.provider}/${question.scenario.model}]: ${question.scenario.text}`,
+            stamp,
+          ]);
+          if (input.reasoning)
+            this.db.run("INSERT INTO comparison_notes VALUES (?,?,?,?,?)", [
+              uid(), eventId, "reasoning", input.reasoning, stamp,
+            ]);
+        }
+      });
+      this.db.run(
+        "UPDATE comparison_sessions SET completed_count=completed_count+1,updated_at=? WHERE id=?",
+        [stamp, input.sessionId],
+      );
+      this.db.run("DELETE FROM comparison_queue WHERE session_id=?", [input.sessionId]);
+      this.db.run("DELETE FROM application_settings WHERE key=?", [
+        `rapid-question:${input.sessionId}`,
+      ]);
+    });
+    await this.recompute(input.setId);
+    await this.db.transaction(() => this.snapshot(input.setId, "after-rapid-question", eventIds.at(-1)!));
+    await this.refreshTensions(input.setId);
+    await this.regenerateQueue(input.sessionId);
   }
 
   async submit(input: {
@@ -959,6 +1173,81 @@ export class BrowserRepository {
     });
     await this.recompute(original.value_set_id);
     if (original.session_id) await this.regenerateQueue(original.session_id);
+  }
+
+  async resetEvidence(setId?: string): Promise<void> {
+    const targetSetIds = setId ? [setId] : this.sets().map((set) => set.id);
+    const stamp = now();
+    await this.db.transaction(() => {
+      for (const targetSetId of targetSetIds) {
+        const eventIds = this.db
+          .query<{ id: string }>(
+            "SELECT id FROM comparison_events WHERE value_set_id=?",
+            [targetSetId],
+          )
+          .map((row) => row.id);
+        const sessionIds = this.db
+          .query<{ id: string }>(
+            "SELECT id FROM comparison_sessions WHERE value_set_id=?",
+            [targetSetId],
+          )
+          .map((row) => row.id);
+        const valueIds = this.values(targetSetId, true).map((value) => value.id);
+        const claimIds = new Set<string>();
+        for (const valueId of valueIds)
+          this.db
+            .query<{ id: string }>("SELECT id FROM claims WHERE value_id=?", [valueId])
+            .forEach((row) => claimIds.add(row.id));
+        for (const eventId of eventIds)
+          this.db
+            .query<{ claim_id: string }>("SELECT claim_id FROM claim_sources WHERE event_id=?", [eventId])
+            .forEach((row) => claimIds.add(row.claim_id));
+        const tensionIds = new Set<string>();
+        for (const valueId of valueIds)
+          this.db
+            .query<{ tension_id: string }>("SELECT tension_id FROM tension_values WHERE value_id=?", [valueId])
+            .forEach((row) => tensionIds.add(row.tension_id));
+        for (const eventId of eventIds)
+          this.db
+            .query<{ tension_id: string }>("SELECT tension_id FROM tension_sources WHERE event_id=?", [eventId])
+            .forEach((row) => tensionIds.add(row.tension_id));
+
+        for (const claimId of claimIds) this.db.run("DELETE FROM claims WHERE id=?", [claimId]);
+        for (const tensionId of tensionIds) this.db.run("DELETE FROM tensions WHERE id=?", [tensionId]);
+        this.db.run("DELETE FROM rating_snapshots WHERE value_set_id=?", [targetSetId]);
+        this.db.run("DELETE FROM ratings WHERE value_set_id=?", [targetSetId]);
+        this.db.run("DELETE FROM manual_tiers WHERE value_set_id=?", [targetSetId]);
+        for (const eventId of eventIds) {
+          this.db.run("DELETE FROM claim_sources WHERE event_id=?", [eventId]);
+          this.db.run("DELETE FROM tension_sources WHERE event_id=?", [eventId]);
+        }
+        this.db.run("DELETE FROM comparison_events WHERE value_set_id=?", [targetSetId]);
+        this.db.run("DELETE FROM comparison_sessions WHERE value_set_id=?", [targetSetId]);
+        this.db.run("DELETE FROM application_settings WHERE key LIKE ?", [
+          `exact-ranking:${targetSetId}:%`,
+        ]);
+        this.db.run("DELETE FROM application_settings WHERE key LIKE ?", [
+          `rapid-ranking:${targetSetId}:%`,
+        ]);
+        for (const sessionId of sessionIds) {
+          this.db.run("DELETE FROM application_settings WHERE key IN (?,?,?)", [
+            `session-mode:${sessionId}`,
+            `rapid-question:${sessionId}`,
+            `exact-ranking-session:${sessionId}`,
+          ]);
+        }
+      }
+      this.db.run("INSERT INTO audit_events VALUES (?,?,?,?,?,?,?)", [
+        uid(),
+        "ranking_evidence",
+        setId ?? "all",
+        "reset",
+        null,
+        json({ valueSetIds: targetSetIds }),
+        stamp,
+      ]);
+    });
+    for (const targetSetId of targetSetIds) await this.recompute(targetSetId);
   }
 
   async refreshTensions(setId: string): Promise<void> {

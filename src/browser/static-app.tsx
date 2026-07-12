@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   Activity,
   ArrowDown,
@@ -10,11 +10,13 @@ import {
   Download,
   FileText,
   History,
+  GripVertical,
   ListOrdered,
   Moon,
   Plus,
   RefreshCw,
   Search,
+  Sparkles,
   Settings,
   SlidersHorizontal,
   Sun,
@@ -32,7 +34,9 @@ import {
   type QueueRow,
   type RatingRow,
   type SetRow,
+  type SessionRow,
   type ValueRow,
+  type RapidQuestion,
   uid,
 } from "./repository";
 import { estimateRanks } from "@/domain/statistics";
@@ -46,6 +50,10 @@ import {
 import type { ComparisonResult, Confidence, Strength } from "@/domain/types";
 import { DEFAULT_SETTINGS } from "@/db/defaults";
 import Papa from "papaparse";
+import {
+  OpenAICompatibleScenarioProvider,
+  type HostedScenarioProvider,
+} from "@/domain/scenarios";
 
 type Route =
   | "dashboard"
@@ -239,6 +247,18 @@ type ViewProps = {
   db: BrowserDatabase;
   mutate: (work: () => Promise<unknown>) => Promise<void>;
 };
+
+type ScenarioConfig = {
+  provider: "local" | HostedScenarioProvider;
+  model: string;
+  apiKey: string;
+};
+
+const scenarioConfig = (): ScenarioConfig => ({
+  provider: (localStorage.getItem("scenario-provider") as ScenarioConfig["provider"]) || "local",
+  model: localStorage.getItem("scenario-model") || "",
+  apiKey: sessionStorage.getItem("scenario-api-key") || "",
+});
 const Page = ({
   title,
   description,
@@ -359,6 +379,7 @@ function Dashboard({ repo, db, mutate }: ViewProps) {
   const sessions = repo.sessions();
   const history = repo.history(set.id);
   const exactRanking = repo.exactRanking(set.id);
+  const rapidRanking = repo.rapidRanking(set.id);
   const settings = repo.settings();
   const snapshots = db.query<{ id: string }>(
     "SELECT id FROM rating_snapshots WHERE value_set_id=? ORDER BY created_at DESC LIMIT ?",
@@ -408,9 +429,11 @@ function Dashboard({ repo, db, mutate }: ViewProps) {
     >
       <div className="grid metrics">
         <Metric
-          label="Comparisons"
-          value={history.length}
-          detail="Recorded decisions"
+          label="Questions"
+          value={sessions
+            .filter((session) => session.value_set_id === set.id)
+            .reduce((sum, session) => sum + session.completed_count, 0)}
+          detail={`${history.length} ranking relations`}
         />
         <Metric
           label="Evidence gaps"
@@ -474,17 +497,21 @@ function Dashboard({ repo, db, mutate }: ViewProps) {
             <span className="badge badge-accent">
               {exactRanking?.complete
                 ? "order complete"
+                : rapidRanking?.complete
+                  ? "rapid pass complete"
                 : diagnostics.state.replaceAll("-", " ")}
             </span>
             <p>
               {exactRanking?.complete
                 ? `All ${exactRanking.total} values are placed. Interval overlap shows which boundaries still merit verification.`
+                : rapidRanking?.complete
+                  ? `${rapidRanking.questions} five-value questions completed. Review intervals and retest unresolved boundaries.`
                 : diagnostics.explanation}
             </p>
             <div className="progress">
               <span
                 style={{
-                  width: exactRanking?.complete
+                  width: exactRanking?.complete || rapidRanking?.complete
                     ? "100%"
                     : `${Math.round(diagnostics.topKStability * 100)}%`,
                 }}
@@ -992,6 +1019,7 @@ function Compare({ repo, db, mutate }: ViewProps) {
   const activeSession = sessions.find((item) => item.status === "active");
   const [sessionId, setSessionId] = useState(activeSession?.id ?? "");
   const [creating, setCreating] = useState(!activeSession);
+  const [sessionMode, setSessionMode] = useState<"rapid" | "exact">("rapid");
   const [newSetId, setNewSetId] = useState(
     localStorage.getItem("values-set") ??
       sets[0]?.id ??
@@ -1021,6 +1049,8 @@ function Compare({ repo, db, mutate }: ViewProps) {
     ? undefined
     : sessions.find((item) => item.id === sessionId);
   const queue = session ? repo.queue(session.id) : [];
+  const activeMode = session ? repo.sessionMode(session.id) : sessionMode;
+  const rapidQuestion = session && activeMode === "rapid" ? repo.rapidQuestion(session.id) : null;
   const exactProgress = session ? repo.exactProgress(session.id) : null;
   const pair = queue[0];
   const values = session ? repo.values(session.value_set_id) : [];
@@ -1076,6 +1106,7 @@ function Compare({ repo, db, mutate }: ViewProps) {
                       selectedSetId,
                       String(data.get("name")),
                       data.getAll("contexts").map(String),
+                      sessionMode,
                     );
                     localStorage.setItem("values-set", selectedSetId);
                     setNewSetId(selectedSetId);
@@ -1112,6 +1143,16 @@ function Compare({ repo, db, mutate }: ViewProps) {
                         ))}
                       </optgroup>
                     )}
+                  </select>
+                </Field>
+                <Field label="Method">
+                  <select
+                    className="select"
+                    value={sessionMode}
+                    onChange={(event) => setSessionMode(event.target.value as "rapid" | "exact")}
+                  >
+                    <option value="rapid">Rapid · rank 5 values per question</option>
+                    <option value="exact">Exact · compare 2 values at a time</option>
                   </select>
                 </Field>
                 <div className="notice small">
@@ -1162,12 +1203,26 @@ function Compare({ repo, db, mutate }: ViewProps) {
         </div>
       </Page>
     );
+  if (activeMode === "rapid" && rapidQuestion)
+    return (
+      <RapidCompare
+        key={rapidQuestion.id}
+        repo={repo}
+        db={db}
+        mutate={mutate}
+        session={session}
+        question={rapidQuestion}
+        values={values}
+        contexts={contexts}
+        onNewSession={() => setCreating(true)}
+      />
+    );
   if (!pair || !left || !right)
     return (
       <Page
         title={session.name}
         description={
-          exactProgress?.complete
+          exactProgress?.complete || session.status === "completed"
             ? "Ordering complete."
             : "No matchup is currently queued."
         }
@@ -1177,11 +1232,11 @@ function Compare({ repo, db, mutate }: ViewProps) {
           </button>
         }
       >
-        <Panel title={exactProgress?.complete ? "Ranking ready" : "Next comparison"}>
-          {exactProgress?.complete ? (
+        <Panel title={exactProgress?.complete || session.status === "completed" ? "Ranking ready" : "Next comparison"}>
+          {exactProgress?.complete || session.status === "completed" ? (
             <div className="spread">
               <div>
-                <strong>{exactProgress.total} values ordered</strong>
+                <strong>{values.length} values ranked</strong>
                 <div className="small muted">Review tiers and interval overlap.</div>
               </div>
               <a className="btn btn-primary" href="#rankings">
@@ -1475,13 +1530,228 @@ function Compare({ repo, db, mutate }: ViewProps) {
   );
 }
 
+function RapidCompare({
+  repo,
+  db,
+  mutate,
+  session,
+  question,
+  values,
+  contexts,
+  onNewSession,
+}: ViewProps & {
+  session: SessionRow;
+  question: RapidQuestion;
+  values: ValueRow[];
+  contexts: ContextRow[];
+  onNewSession: () => void;
+}) {
+  const questionValues = question.valueIds
+    .map((id) => values.find((value) => value.id === id))
+    .filter((value): value is ValueRow => Boolean(value));
+  const [order, setOrder] = useState(question.valueIds);
+  const [scenario, setScenario] = useState(question.scenario);
+  const [scenarioError, setScenarioError] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [notes, setNotes] = useState(false);
+  const attempted = useRef("");
+  const sessionContextIds = db
+    .query<{ context_id: string }>(
+      "SELECT context_id FROM session_contexts WHERE session_id=?",
+      [session.id],
+    )
+    .map((row) => row.context_id);
+  const contextNames = contexts
+    .filter((context) => sessionContextIds.includes(context.id))
+    .map((context) => context.name);
+
+  const generateScenario = async (automatic = false) => {
+    const config = scenarioConfig();
+    if (config.provider === "local") return;
+    if (!config.apiKey) {
+      if (!automatic) setScenarioError("Add a scenario API key in Settings.");
+      return;
+    }
+    setGenerating(true);
+    setScenarioError("");
+    try {
+      const provider = new OpenAICompatibleScenarioProvider({
+        provider: config.provider,
+        apiKey: config.apiKey,
+        model: config.model,
+      });
+      const generated = await provider.generate({
+        values: questionValues.map((value) => ({
+          name: value.name,
+          definition: value.personal_definition || value.short_definition,
+          category: value.parent_category,
+        })),
+        contexts: contextNames,
+        purpose: session.name,
+        question: question.question,
+      });
+      setScenario(generated);
+      await mutate(() => repo.updateRapidScenario(session.id, generated));
+    } catch (cause) {
+      setScenarioError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  useEffect(() => {
+    const config = scenarioConfig();
+    const requestKey = `scenario-request:${question.id}`;
+    if (
+      scenario.provider === "local" &&
+      config.provider !== "local" &&
+      config.apiKey &&
+      attempted.current !== question.id &&
+      !sessionStorage.getItem(requestKey)
+    ) {
+      attempted.current = question.id;
+      sessionStorage.setItem(requestKey, "started");
+      void generateScenario(true);
+    }
+    // The request is keyed in sessionStorage; rerunning for other state is unnecessary.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [question.id]);
+
+  const move = (index: number, delta: number) =>
+    setOrder((current) => {
+      const next = [...current];
+      const target = index + delta;
+      if (target < 0 || target >= next.length) return current;
+      [next[index], next[target]] = [next[target]!, next[index]!];
+      return next;
+    });
+  const reorder = (sourceId: string, targetId: string) =>
+    setOrder((current) => {
+      const source = current.indexOf(sourceId);
+      const target = current.indexOf(targetId);
+      if (source < 0 || target < 0 || source === target) return current;
+      const next = [...current];
+      next.splice(source, 1);
+      next.splice(target, 0, sourceId);
+      return next;
+    });
+
+  return (
+    <Page
+      title={session.name}
+      description={question.reason}
+      actions={
+        <div className="row">
+          <span className="badge">{question.question}/{question.budget}</span>
+          <button className="btn" onClick={onNewSession}>
+            <Plus size={14} /> New session
+          </button>
+          <button
+            className="btn"
+            onClick={() =>
+              mutate(() =>
+                db.transaction(() =>
+                  db.run("UPDATE comparison_sessions SET status='paused',updated_at=? WHERE id=?", [Date.now(), session.id]),
+                ),
+              )
+            }
+          >
+            Pause
+          </button>
+        </div>
+      }
+    >
+      <div className="ordering-strip rapid-strip">
+        <div>
+          <span className="ordering-label">QUESTION {question.question} OF {question.budget}</span>
+          <strong>Rank what should matter most.</strong>
+        </div>
+        <div className="ordering-progress">
+          <span style={{ width: `${((question.question - 1) / question.budget) * 100}%` }} />
+        </div>
+        <span className="mono muted">5 at a time</span>
+      </div>
+      <section className="scenario-band" aria-live="polite">
+        <Sparkles size={18} />
+        <div>
+          <span className="scenario-label">
+            {generating ? "GENERATING SCENARIO" : `${scenario.provider.toUpperCase()} SCENARIO`}
+          </span>
+          <p>{generating ? "Creating a neutral decision context…" : scenario.text}</p>
+          {scenarioError && <div className="small badge-danger">{scenarioError}</div>}
+        </div>
+        {scenarioConfig().provider !== "local" && (
+          <button className="btn btn-sm" disabled={generating} onClick={() => void generateScenario(false)}>
+            <RefreshCw size={13} /> Regenerate
+          </button>
+        )}
+      </section>
+      <form
+        onSubmit={(event) => {
+          const data = submit(event);
+          mutate(() =>
+            repo.submitRapidRanking({
+              sessionId: session.id,
+              setId: session.value_set_id,
+              orderedValueIds: order,
+              contexts: sessionContextIds,
+              reasoning: String(data.get("reasoning") ?? ""),
+            }),
+          );
+        }}
+      >
+        <div className="rapid-rank-list">
+          {order.map((valueId, index) => {
+            const value = questionValues.find((item) => item.id === valueId)!;
+            return (
+              <article
+                className="rapid-rank-row"
+                draggable
+                key={value.id}
+                onDragStart={(event) => event.dataTransfer.setData("text/value-id", value.id)}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => reorder(event.dataTransfer.getData("text/value-id"), value.id)}
+              >
+                <span className="rapid-rank-number">{index + 1}</span>
+                <GripVertical className="muted" size={18} aria-hidden="true" />
+                <div className="rapid-rank-copy">
+                  <strong>{value.name}</strong>
+                  <span>{value.personal_definition || value.short_definition}</span>
+                </div>
+                <div className="rapid-rank-actions">
+                  <button type="button" className="btn btn-icon btn-sm" disabled={index === 0} onClick={() => move(index, -1)} title="Move up">
+                    <ArrowUp size={14} />
+                  </button>
+                  <button type="button" className="btn btn-icon btn-sm" disabled={index === order.length - 1} onClick={() => move(index, 1)} title="Move down">
+                    <ArrowDown size={14} />
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+        <div className="rapid-submit">
+          <button type="button" className="btn" onClick={() => setNotes((value) => !value)}>
+            Add note
+          </button>
+          {notes && <input className="input" name="reasoning" placeholder="Why this order?" />}
+          <button className="btn btn-primary" type="submit">
+            <Check size={15} /> Use this order
+          </button>
+        </div>
+      </form>
+    </Page>
+  );
+}
+
 function Queue({ repo, db, mutate }: ViewProps) {
   const sessions = repo.sessions();
   const session =
     sessions.find((item) => item.status === "active") ?? sessions[0];
   const queue = session ? repo.queue(session.id) : [];
   const values = session ? repo.values(session.value_set_id) : [];
-  const progress = session ? repo.exactProgress(session.id) : null;
+  const rapid = session ? repo.rapidQuestion(session.id) : null;
+  const progress = session && !rapid ? repo.exactProgress(session.id) : null;
   const move = (item: QueueRow, delta: number) =>
     mutate(() =>
       db.transaction(() => {
@@ -1522,10 +1792,21 @@ function Queue({ repo, db, mutate }: ViewProps) {
       {session ? (
         <div className="grid two-col">
           <Panel
-            title={progress?.complete ? "Ordering complete" : "Next required comparison"}
-            action={progress && <span className="mono">{progress.placed}/{progress.total} placed</span>}
+            title={rapid ? `Rapid question ${rapid.question}/${rapid.budget}` : progress?.complete ? "Ordering complete" : "Next required comparison"}
+            action={rapid ? <span className="badge">5 values</span> : progress && <span className="mono">{progress.placed}/{progress.total} placed</span>}
           >
-            <div className="table-wrap">
+            {rapid ? (
+              <div className="stack">
+                <p style={{ marginTop: 0 }}>{rapid.scenario.text}</p>
+                {rapid.valueIds.map((id, index) => (
+                  <div className="spread" key={id}>
+                    <span className="mono">{index + 1}</span>
+                    <strong>{values.find((value) => value.id === id)?.name}</strong>
+                  </div>
+                ))}
+                <a className="btn btn-primary" href="#compare">Rank these values</a>
+              </div>
+            ) : <div className="table-wrap">
               <table className="table">
                 <thead>
                   <tr>
@@ -1579,7 +1860,7 @@ function Queue({ repo, db, mutate }: ViewProps) {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </div>}
           </Panel>
           <Panel title="Manual comparison">
             <form
@@ -3513,6 +3794,7 @@ function SettingsView({ repo, db, mutate }: ViewProps) {
           </form>
         </Panel>
         <div className="stack">
+          <ScenarioSettings />
           <Panel title="Contexts">
             <div className="stack">
               {contexts.map((context) => (
@@ -3604,9 +3886,132 @@ function SettingsView({ repo, db, mutate }: ViewProps) {
               and replay remains deterministic.
             </p>
           </Panel>
+          <ResetEvidence repo={repo} mutate={mutate} />
         </div>
       </div>
     </Page>
+  );
+}
+
+function ScenarioSettings() {
+  const initial = scenarioConfig();
+  const [provider, setProvider] = useState<ScenarioConfig["provider"]>(initial.provider);
+  const [saved, setSaved] = useState(false);
+  return (
+    <Panel title="Decision scenarios">
+      <form
+        className="stack"
+        onSubmit={(event) => {
+          const data = submit(event);
+          localStorage.setItem("scenario-provider", provider);
+          localStorage.setItem("scenario-model", String(data.get("model") ?? ""));
+          const key = String(data.get("apiKey") ?? "").trim();
+          if (key) sessionStorage.setItem("scenario-api-key", key);
+          else sessionStorage.removeItem("scenario-api-key");
+          setSaved(true);
+        }}
+      >
+        <Field label="Generator">
+          <select
+            className="select"
+            value={provider}
+            onChange={(event) => {
+              setProvider(event.target.value as ScenarioConfig["provider"]);
+              setSaved(false);
+            }}
+          >
+            <option value="local">On-device · definitions only</option>
+            <option value="openrouter">OpenRouter Free</option>
+            <option value="deepseek">DeepSeek V4 Flash</option>
+          </select>
+        </Field>
+        {provider !== "local" && (
+          <>
+            <Field label="API key · kept for this tab only">
+              <input
+                className="input"
+                name="apiKey"
+                type="password"
+                autoComplete="off"
+                defaultValue={initial.apiKey}
+                required
+              />
+            </Field>
+            <Field label="Model">
+              <input
+                className="input"
+                name="model"
+                defaultValue={
+                  initial.model ||
+                  (provider === "openrouter" ? "openrouter/free" : "deepseek-v4-flash")
+                }
+              />
+            </Field>
+          </>
+        )}
+        <div className="spread">
+          <span className="small muted">
+            {provider === "local"
+              ? "No network request. Scenarios are composed from the active definitions."
+              : "Generated automatically when each rapid question opens."}
+          </span>
+          <button className="btn btn-primary">{saved ? "Saved" : "Save"}</button>
+        </div>
+      </form>
+    </Panel>
+  );
+}
+
+function ResetEvidence({ repo, mutate }: Pick<ViewProps, "repo" | "mutate">) {
+  const sets = repo.sets();
+  const [setId, setSetId] = useState(sets[0]?.id ?? "");
+  const [setConfirmation, setSetConfirmation] = useState("");
+  const [allConfirmation, setAllConfirmation] = useState("");
+  const selected = sets.find((set) => set.id === setId);
+  return (
+    <Panel title="Reset ranking evidence">
+      <div className="stack">
+        <p className="small muted">
+          Comparisons, sessions, ratings, snapshots, claims, tensions, and manual tiers are removed. Values and definitions remain.
+        </p>
+        <Field label="Value set">
+          <select className="select" value={setId} onChange={(event) => setSetId(event.target.value)}>
+            {sets.map((set) => <option key={set.id} value={set.id}>{set.name}</option>)}
+          </select>
+        </Field>
+        <Field label={`Type RESET ${selected?.name ?? "SET"}`}>
+          <input className="input" value={setConfirmation} onChange={(event) => setSetConfirmation(event.target.value)} />
+        </Field>
+        <button
+          className="btn btn-danger"
+          disabled={!selected || setConfirmation !== `RESET ${selected.name}`}
+          onClick={() =>
+            mutate(async () => {
+              await repo.resetEvidence(setId);
+              setSetConfirmation("");
+            })
+          }
+        >
+          Reset this value set
+        </button>
+        <hr className="divider" />
+        <Field label="Type RESET ALL">
+          <input className="input" value={allConfirmation} onChange={(event) => setAllConfirmation(event.target.value)} />
+        </Field>
+        <button
+          className="btn btn-danger"
+          disabled={allConfirmation !== "RESET ALL"}
+          onClick={() =>
+            mutate(async () => {
+              await repo.resetEvidence();
+              setAllConfirmation("");
+            })
+          }
+        >
+          Reset every value set
+        </button>
+      </div>
+    </Panel>
   );
 }
 const Num = ({
