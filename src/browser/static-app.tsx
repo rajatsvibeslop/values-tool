@@ -275,11 +275,20 @@ const scenarioConfig = (): ScenarioConfig => {
     provider,
     model:
       provider === "openrouter" &&
-      (!storedModel || storedModel === "deepseek/deepseek-v4-flash:free")
+      (!storedModel || storedModel === "openrouter/free" || storedModel.endsWith(":free"))
         ? "openrouter/free"
         : storedModel,
     apiKey: sessionStorage.getItem("scenario-api-key") || "",
   };
+};
+const scenarioMatchesConfig = (
+  scenario: GeneratedScenario,
+  config: ScenarioConfig,
+) => {
+  if (config.provider === "local") return scenario.provider === "local";
+  if (config.provider === "openrouter" && config.model === "openrouter/free")
+    return scenario.provider === "openrouter" && scenario.model.includes("gemma-4-26b");
+  return scenario.provider === config.provider && scenario.model.includes(config.model);
 };
 const scenarioGenerationInFlight = new Map<string, Promise<GeneratedScenario>>();
 const OPENROUTER_FREE_MODELS = [
@@ -1626,16 +1635,20 @@ function RapidCompare({
   const [scenario, setScenario] = useState(question.scenario);
   const [scenarioError, setScenarioError] = useState("");
   const [generating, setGenerating] = useState(
-    () => scenarioConfig().provider !== "local" && question.scenario.provider === "local",
+    () => {
+      const config = scenarioConfig();
+      return config.provider !== "local" && !scenarioMatchesConfig(question.scenario, config);
+    },
   );
   const [replacingScenario, setReplacingScenario] = useState(false);
   const [notes, setNotes] = useState(false);
   const [mostChoiceId, setMostChoiceId] = useState("");
   const [choosing, setChoosing] = useState(false);
   const [bufferStatus, setBufferStatus] = useState(() => {
+    const config = scenarioConfig();
     const buffered = repo.preparedRapidQuestions(session.id);
     return {
-      ready: buffered.filter((item) => item.scenario.provider !== "local").length,
+      ready: buffered.filter((item) => scenarioMatchesConfig(item.scenario, config)).length,
       total: buffered.length || 5,
     };
   });
@@ -1737,11 +1750,11 @@ function RapidCompare({
     if (config.provider === "local" || !config.apiKey) return;
     const buffer = await repo.prepareRapidQuestions(session.id, 5);
     setBufferStatus({
-      ready: buffer.filter((item) => item.scenario.provider !== "local").length,
+      ready: buffer.filter((item) => scenarioMatchesConfig(item.scenario, config)).length,
       total: buffer.length,
     });
     const prepared = buffer.filter(
-      (item) => item.scenario.provider === "local",
+      (item) => !scenarioMatchesConfig(item.scenario, config),
     );
     let cursor = 0;
     const worker = async () => {
@@ -1757,7 +1770,7 @@ function RapidCompare({
             await repo.updatePreparedRapidScenario(session.id, target.id, generated);
             const updated = repo.preparedRapidQuestions(session.id);
             setBufferStatus({
-              ready: updated.filter((item) => item.scenario.provider !== "local").length,
+              ready: updated.filter((item) => scenarioMatchesConfig(item.scenario, config)).length,
               total: updated.length,
             });
             break;
@@ -1770,7 +1783,7 @@ function RapidCompare({
     await Promise.all(Array.from({ length: Math.min(2, prepared.length) }, worker));
     const remaining = repo
       .preparedRapidQuestions(session.id)
-      .some((item) => item.scenario.provider === "local");
+      .some((item) => !scenarioMatchesConfig(item.scenario, config));
     if (remaining && retryRound < 2) {
       await delay(2500 * (retryRound + 1));
       await prefetchScenarioBuffer(retryRound + 1);
@@ -1782,7 +1795,7 @@ function RapidCompare({
     const currentNeedsScenario =
       config.provider !== "local" &&
       config.apiKey &&
-      (scenario.provider === "local" ||
+      (!scenarioMatchesConfig(scenario, config) ||
         (scenario.choices?.filter((choice) => choice.focalValueId).length ?? 0) < 2);
     if (currentNeedsScenario) {
       if (attempted.current !== question.id) {
@@ -1822,12 +1835,13 @@ function RapidCompare({
       question.valueIds.includes(choice.focalValueId),
   );
   const hostedScenarioMode = scenarioConfig().provider !== "local";
+  const currentScenarioReady = scenarioMatchesConfig(scenario, scenarioConfig());
   const useScenarioChoices = hostedScenarioMode && scenarioChoices.length >= 2;
   const awaitingHostedScenario =
     hostedScenarioMode &&
-    (replacingScenario || (generating && scenario.provider === "local"));
+    (replacingScenario || (generating && !currentScenarioReady));
   const hostedScenarioFailed =
-    hostedScenarioMode && scenario.provider === "local" && !generating;
+    hostedScenarioMode && !currentScenarioReady && !generating;
   const mostChoice = scenarioChoices.find((choice) => choice.id === mostChoiceId);
   const visibleScenarioChoices = mostChoice
     ? scenarioChoices.filter((choice) => choice.id !== mostChoice.id)

@@ -157,7 +157,13 @@ test("shows Broad 100 manual tiers before any comparison session", async ({ page
 
 test("stores hosted scenario credentials only for the browser tab", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "One settings check is sufficient");
+  await page.evaluate(() => {
+    localStorage.setItem("scenario-provider", "openrouter");
+    localStorage.setItem("scenario-model", "qwen/qwen3-next-80b-a3b-instruct:free");
+  });
+  await page.reload();
   await page.locator('a[href="#settings"]').first().click();
+  await expect(page.getByLabel("Model")).toHaveValue("openrouter/free");
   await page.getByLabel("Generator").selectOption("openrouter");
   await page.getByLabel(/API key/).fill("test-session-key");
   await page.getByLabel("Model").fill("openrouter/free");
