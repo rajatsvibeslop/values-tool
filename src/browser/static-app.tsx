@@ -283,9 +283,7 @@ const scenarioConfig = (): ScenarioConfig => {
 };
 const scenarioGenerationInFlight = new Map<string, Promise<GeneratedScenario>>();
 const OPENROUTER_FREE_MODELS = [
-  "qwen/qwen3-next-80b-a3b-instruct:free",
   "google/gemma-4-26b-a4b-it:free",
-  "openrouter/free",
 ];
 const delay = (milliseconds: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
@@ -1716,6 +1714,7 @@ function RapidCompare({
           await repo.updateRapidScenario(session.id, generated, question.id);
           if (!interactionStarted.current) setScenario(generated);
         }
+        setScenarioError("");
         setGenerating(false);
         setReplacingScenario(false);
         return true;

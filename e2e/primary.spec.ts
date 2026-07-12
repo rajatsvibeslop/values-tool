@@ -178,11 +178,7 @@ test("stores hosted scenario credentials only for the browser tab", async ({ pag
     };
     expect(body.max_tokens).toBe(600);
     requestedModels.push(body.model);
-    expect([
-      "qwen/qwen3-next-80b-a3b-instruct:free",
-      "google/gemma-4-26b-a4b-it:free",
-      "openrouter/free",
-    ]).toContain(body.model);
+    expect(body.model).toBe("google/gemma-4-26b-a4b-it:free");
     expect(body.response_format.type).toBe("json_schema");
     expect(body.response_format.json_schema.strict).toBe(true);
     expect(body.plugins).toEqual([{ id: "response-healing" }]);
@@ -217,7 +213,7 @@ test("stores hosted scenario credentials only for the browser tab", async ({ pag
   await expect(page.getByText("GENERATING DECISION")).toBeVisible();
   await expect(page.getByText(/secure familiar role/)).toBeVisible();
   expect(requestedModels.slice(0, 2)).toEqual([
-    "qwen/qwen3-next-80b-a3b-instruct:free",
+    "google/gemma-4-26b-a4b-it:free",
     "google/gemma-4-26b-a4b-it:free",
   ]);
   await expect(page.locator(".scenario-choice")).toHaveCount(3);

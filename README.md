@@ -133,11 +133,11 @@ Configure the generator in
 
 - **On-device:** always available; composes a decision frame from the current value
   definitions and context without a network request.
-- **OpenRouter Free:** uses the existing OpenRouter key and tries explicit current free
-  models in order: Qwen3 Next Instruct, Gemma 4 26B, then the general free router. Older
-  saved `deepseek/deepseek-v4-flash:free` configurations migrate automatically because
-  that free model ID is no longer listed. No paid model or DeepSeek key is involved.
-  Free endpoints remain subject to availability and rate limits.
+- **OpenRouter Free:** uses the existing OpenRouter key with the explicit Gemma 4 26B
+  free route. Live production-prompt probes rejected other current free routes that
+  returned rate limits, provider failures, or exhausted output budgets before producing
+  JSON. Older saved `deepseek/deepseek-v4-flash:free` configurations migrate
+  automatically. No paid model or DeepSeek key is involved.
 - **DeepSeek V4 Flash:** uses the OpenAI-compatible DeepSeek API and defaults to
   `deepseek-v4-flash`.
 

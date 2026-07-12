@@ -110,7 +110,7 @@ Requirements:
 - Every action must respond to that exact decision. Actions must not introduce any fact,
   obligation, relationship, hazard, organization, or constraint absent from the scenario.
 - Include every fact needed to understand every action in the shared scenario.
-- Choose a concrete 2-7 word decision anchor (for example "the Sunday project").
+- Choose a concrete 2-7 word decision anchor that names the central decision object.
   Include that exact anchor verbatim in the scenario and in every action so coherence is verifiable.
 - Keep the outcome stakes constant across people; vary only which concern guides their response.
 - Write the scenario in 2 concise sentences, under 70 words total.
@@ -297,7 +297,7 @@ export class OpenAICompatibleScenarioProvider implements ScenarioProvider {
     const obsoleteFreeModel = configuredModel === "deepseek/deepseek-v4-flash:free";
     const model = openRouter
       ? !configuredModel || obsoleteFreeModel
-        ? "qwen/qwen3-next-80b-a3b-instruct:free"
+        ? "google/gemma-4-26b-a4b-it:free"
         : configuredModel
       : configuredModel || "deepseek-v4-flash";
     const response = await fetch(endpoint, {
