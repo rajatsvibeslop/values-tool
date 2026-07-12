@@ -24,7 +24,8 @@ describe("definition-derived scenarios", () => {
     const result = deriveScenario(request);
     expect(result.provider).toBe("local");
     expect(result.text).toContain("Work");
-    expect(result.text).toContain("maintain dependable foundations");
+    expect(result.choices).toHaveLength(2);
+    expect(result.choices?.every((choice) => choice.focalValueId)).toBe(true);
   });
 
   it("normalizes JSON and multipart provider responses", () => {

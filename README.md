@@ -129,9 +129,9 @@ Configure the generator in
 
 - **On-device:** always available; composes a decision frame from the current value
   definitions and context without a network request.
-- **OpenRouter Free:** uses `openrouter/free`, which routes to a currently available free
-  model. It requires an OpenRouter key and is subject to free-tier availability and rate
-  limits.
+- **OpenRouter Free:** uses the existing OpenRouter key with
+  `deepseek/deepseek-v4-flash:free`, falling back to `openrouter/free`. No DeepSeek key is
+  involved. Free endpoints remain subject to availability and rate limits.
 - **DeepSeek V4 Flash:** uses the OpenAI-compatible DeepSeek API and defaults to
   `deepseek-v4-flash`.
 
@@ -140,6 +140,10 @@ profiles, selected contexts, and session purpose. API keys are kept in `sessionS
 are removed when the tab is closed, and never enter SQLite, backups, exports, or share
 links. The scenario, every portrait, most/least response, provider, and model are
 preserved as evidence with the answer.
+
+Question navigation never requires a generation click. A deterministic local portrait is
+available immediately while hosted wording is requested in the background. Slow or failed
+hosted requests therefore do not block the instrument or require manual recovery.
 
 ## Exact Ordering and Adaptive Verification
 

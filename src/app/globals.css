@@ -136,6 +136,8 @@ button, input, textarea, select, summary, a { outline-offset: 2px; }
 .scenario-label { font-family: "IBM Plex Mono", monospace; color: var(--muted); font-size: 10px; font-weight: 600; }
 .scenario-loading { min-height: 190px; display: grid; place-items: center; border-top: 2px solid var(--text); }
 .scenario-actions { display: grid; gap: 12px; }
+.portrait-instruction { min-height: 54px; padding: 8px 12px; display: grid; align-content: center; gap: 3px; border-left: 3px solid var(--accent); background: var(--accent-soft); }
+.portrait-instruction strong { font-size: 14px; }
 .scenario-choice-list { display: grid; border-top: 2px solid var(--text); }
 .scenario-choice { width: 100%; min-height: 72px; padding: 12px 14px; border: 0; border-bottom: 1px solid var(--border); background: var(--surface); color: var(--text); display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 14px; text-align: left; font: inherit; font-size: 16px; line-height: 1.35; cursor: pointer; }
 .scenario-choice:hover, .scenario-choice:focus-visible { background: var(--accent-soft); color: var(--accent); }

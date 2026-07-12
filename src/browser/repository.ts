@@ -225,9 +225,12 @@ export class BrowserRepository {
   async updateRapidScenario(
     sessionId: string,
     scenario: GeneratedScenario,
+    expectedQuestionId?: string,
   ): Promise<void> {
     const question = this.rapidQuestion(sessionId);
     if (!question) throw new Error("Rapid question not found");
+    if (expectedQuestionId && question.id !== expectedQuestionId)
+      throw new Error("The scenario question has already advanced");
     await this.db.transaction(() =>
       this.db.run(
         "UPDATE application_settings SET value=?,updated_at=? WHERE key=?",
@@ -966,6 +969,7 @@ export class BrowserRepository {
       sessionId: session.id,
       scenario: deriveScenario({
         values: groupValues.map((value) => ({
+          id: value.id,
           name: value.name,
           definition: value.personal_definition || value.short_definition,
           category: value.parent_category,

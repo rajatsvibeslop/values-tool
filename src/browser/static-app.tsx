@@ -1563,6 +1563,7 @@ function RapidCompare({
   const [mostChoiceId, setMostChoiceId] = useState("");
   const [choosing, setChoosing] = useState(false);
   const attempted = useRef("");
+  const interactionStarted = useRef(false);
   const sessionContextIds = db
     .query<{ context_id: string }>(
       "SELECT context_id FROM session_contexts WHERE session_id=?",
@@ -1580,7 +1581,10 @@ function RapidCompare({
       if (!automatic) setScenarioError("Add a scenario API key in Settings.");
       return;
     }
-    setMostChoiceId("");
+    if (!automatic) {
+      interactionStarted.current = false;
+      setMostChoiceId("");
+    }
     setGenerating(true);
     setScenarioError("");
     try {
@@ -1600,12 +1604,15 @@ function RapidCompare({
         purpose: session.name,
         question: question.question,
       });
-      setScenario(generated);
-      await mutate(() => repo.updateRapidScenario(session.id, generated));
+      if (!interactionStarted.current) {
+        await repo.updateRapidScenario(session.id, generated, question.id);
+        if (!interactionStarted.current) setScenario(generated);
+      }
     } catch (cause) {
-      sessionStorage.removeItem(`scenario-portraits:v4:${question.id}`);
+      sessionStorage.removeItem(`scenario-portraits:v5:${question.id}`);
       const message = cause instanceof Error ? cause.message : String(cause);
-      setScenarioError(`${message}. Using the on-device scenario.`);
+      if (!automatic)
+        setScenarioError(`${message}. The current choices are still available.`);
     } finally {
       setGenerating(false);
     }
@@ -1613,11 +1620,12 @@ function RapidCompare({
 
   useEffect(() => {
     const config = scenarioConfig();
-    const requestKey = `scenario-portraits:v4:${question.id}`;
+    const requestKey = `scenario-portraits:v5:${question.id}`;
     if (
       config.provider !== "local" &&
       config.apiKey &&
-      (scenario.choices?.filter((choice) => choice.focalValueId).length ?? 0) < 2 &&
+      (scenario.provider === "local" ||
+        (scenario.choices?.filter((choice) => choice.focalValueId).length ?? 0) < 2) &&
       attempted.current !== question.id &&
       !sessionStorage.getItem(requestKey)
     ) {
@@ -1652,10 +1660,15 @@ function RapidCompare({
       question.valueIds.includes(choice.focalValueId),
   );
   const hostedScenarioMode = scenarioConfig().provider !== "local";
-  const useScenarioChoices = scenarioChoices.length >= 2;
+  const useScenarioChoices = hostedScenarioMode && scenarioChoices.length >= 2;
+  const mostChoice = scenarioChoices.find((choice) => choice.id === mostChoiceId);
+  const visibleScenarioChoices = mostChoice
+    ? scenarioChoices.filter((choice) => choice.id !== mostChoice.id)
+    : scenarioChoices;
   const chooseScenario = async (choice: ScenarioChoice) => {
     if (choosing) return;
     if (!mostChoiceId) {
+      interactionStarted.current = true;
       setMostChoiceId(choice.id);
       return;
     }
@@ -1718,21 +1731,28 @@ function RapidCompare({
         <Sparkles size={18} />
         <div>
           <span className="scenario-label">
-            {generating ? "GENERATING SCENARIO" : "DECISION SCENARIO"}
+            DECISION SCENARIO
           </span>
-          <p>{generating ? "Creating a neutral decision context…" : scenario.text}</p>
+          <p>{scenario.text}</p>
           {scenarioError && <div className="small badge-danger">{scenarioError}</div>}
         </div>
       </section>
-      {generating ? (
-        <div className="scenario-loading muted">Preparing three possible actions…</div>
-      ) : useScenarioChoices ? (
+      {useScenarioChoices ? (
         <section className="scenario-actions" aria-label="Possible actions">
+          <div className="portrait-instruction" aria-live="polite">
+            <span className="scenario-label">STEP {mostChoice ? "2" : "1"} OF 2</span>
+            <strong>
+              {mostChoice
+                ? `Person ${mostChoice.id} is most like you. Now choose the person least like you.`
+                : "Choose the person whose decision is most like what you would do."}
+            </strong>
+          </div>
           <div className="scenario-choice-list">
-            {scenarioChoices.map((choice, index) => (
+            {visibleScenarioChoices.map((choice, index) => (
               <button
-                className={`scenario-choice ${choice.id === mostChoiceId ? "scenario-choice-selected" : ""}`}
-                disabled={choosing || choice.id === mostChoiceId}
+                aria-label={`${mostChoice ? "Least like me" : "Most like me"}: Person ${choice.id}. ${choice.text}`}
+                className="scenario-choice"
+                disabled={choosing}
                 key={`${choice.id}:${index}`}
                 onClick={() => void chooseScenario(choice)}
                 type="button"
@@ -1742,9 +1762,7 @@ function RapidCompare({
                   <strong>Person {choice.id}</strong>
                   <span>{choice.text}</span>
                 </span>
-                {choice.id === mostChoiceId
-                  ? <Check size={17} aria-label="Most like you" />
-                  : <ChevronRight size={17} aria-hidden="true" />}
+                <ChevronRight size={17} aria-hidden="true" />
               </button>
             ))}
           </div>
@@ -1760,10 +1778,8 @@ function RapidCompare({
           </div>
         </section>
       ) : hostedScenarioMode ? (
-        <div className="scenario-loading">
-          <button className="btn btn-primary" type="button" onClick={() => void generateScenario(false)}>
-            <RefreshCw size={14} /> Generate actions
-          </button>
+        <div className="scenario-loading muted">
+          {generating ? "Preparing choices…" : "Preparing another scenario…"}
         </div>
       ) : <form
         onSubmit={(event) => {
@@ -4022,7 +4038,7 @@ function ScenarioSettings() {
                 name="model"
                 defaultValue={
                   initial.model ||
-                  (provider === "openrouter" ? "openrouter/free" : "deepseek-v4-flash")
+                  (provider === "openrouter" ? "deepseek/deepseek-v4-flash:free" : "deepseek-v4-flash")
                 }
               />
             </Field>

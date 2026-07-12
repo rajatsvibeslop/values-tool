@@ -74,17 +74,25 @@ export function buildScenarioProfiles(
 
 export function deriveScenario(input: ScenarioRequest): GeneratedScenario {
   const context = input.contexts.length ? input.contexts.join(" and ") : "an important life decision";
-  const stakes = input.values
-    .map((value) => clean(value.definition).replace(/[.!?]+$/, "").toLowerCase())
-    .filter(Boolean);
-  const text = stakes.length
-    ? `In ${context}, imagine a consequential choice with real tradeoffs among ${stakes.join("; ")}. No option protects everything. Rank the values by what should guide the decision.`
-    : `In ${context}, imagine a consequential choice where these priorities point toward different actions. Rank them by what should guide the decision.`;
+  const profiles = input.profiles?.length
+    ? input.profiles
+    : buildScenarioProfiles(input.values, `${input.purpose}:${input.question}`);
   return {
-    text,
+    text: `In ${context}, three people face the same consequential decision. Each protects something important while accepting a different cost.`,
     provider: "local",
     model: "definition-derived",
     generatedAt: new Date().toISOString(),
+    choices: profiles.map((profile) => {
+      const value = input.values.find(
+        (item) => (item.id ?? item.name) === profile.focalValueId,
+      )!;
+      const priority = clean(value.definition).replace(/[.!?]+$/, "").toLowerCase();
+      return {
+        id: profile.id,
+        focalValueId: profile.focalValueId,
+        text: `Chooses the path that best protects ${priority}, accepting tradeoffs elsewhere.`,
+      };
+    }),
   };
 }
 
@@ -237,11 +245,15 @@ export class OpenAICompatibleScenarioProvider implements ScenarioProvider {
     const endpoint = openRouter
       ? "https://openrouter.ai/api/v1/chat/completions"
       : "https://api.deepseek.com/chat/completions";
-    const model =
-      this.config.model?.trim() ||
-      (openRouter ? "openrouter/free" : "deepseek-v4-flash");
+    const configuredModel = this.config.model?.trim();
+    const useFastFreeRoute =
+      openRouter && (!configuredModel || configuredModel === "openrouter/free");
+    const model = useFastFreeRoute
+      ? "deepseek/deepseek-v4-flash:free"
+      : configuredModel || "deepseek-v4-flash";
     const response = await fetch(endpoint, {
       method: "POST",
+      signal: AbortSignal.timeout(20_000),
       headers: {
         Authorization: `Bearer ${this.config.apiKey.trim()}`,
         "Content-Type": "application/json",
@@ -253,7 +265,9 @@ export class OpenAICompatibleScenarioProvider implements ScenarioProvider {
           : {}),
       },
       body: JSON.stringify({
-        model,
+        ...(useFastFreeRoute
+          ? { models: [model, "openrouter/free"] }
+          : { model }),
         messages: [
           { role: "system", content: "You design neutral behavioral decision scenarios for reflective research." },
           { role: "user", content: scenarioPrompt(request) },
@@ -261,14 +275,19 @@ export class OpenAICompatibleScenarioProvider implements ScenarioProvider {
         temperature: 0.7,
         // The free router can select a mandatory-reasoning model. Its internal
         // tokens share this budget, so leave room for a short final answer.
-        max_tokens: openRouter ? 1_400 : 400,
+        max_tokens: openRouter ? 600 : 400,
         response_format: openRouter
           ? scenarioResponseFormat(request)
           : { type: "json_object" },
         ...(openRouter
           ? {
               plugins: [{ id: "response-healing" }],
-              provider: { require_parameters: true },
+              provider: {
+                require_parameters: true,
+                allow_fallbacks: true,
+                sort: "latency",
+                preferred_max_latency: { p90: 8 },
+              },
             }
           : { thinking: { type: "disabled" } }),
       }),
