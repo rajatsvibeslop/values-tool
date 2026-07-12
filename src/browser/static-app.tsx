@@ -91,7 +91,22 @@ export function StaticApp() {
   );
   useEffect(() => {
     BrowserDatabase.create()
-      .then(setDb)
+      .then(async (database) => {
+        const repository = new BrowserRepository(database);
+        for (const session of repository
+          .sessions()
+          .filter((item) => item.status !== "completed")) {
+          const automatic = repository
+            .queue(session.id)
+            .filter((item) => item.reason !== "Manual comparison");
+          if (
+            automatic.length !== 1 ||
+            automatic.some((item) => !item.reason.startsWith("Exact ordering"))
+          )
+            await repository.regenerateQueue(session.id);
+        }
+        setDb(database);
+      })
       .catch((cause) =>
         setError(cause instanceof Error ? cause.message : String(cause)),
       );
