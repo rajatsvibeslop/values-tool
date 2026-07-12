@@ -28,7 +28,7 @@
 - [x] Broad 100 and public-domain Miller card-sort presets
 - [x] Tier-first ranking/report views with interval plots and relation matrices
 - [x] Committed Swiss instrument visual system and bundled typography
-- [x] Rapid five-value ranking sessions with a sub-100-question budget
+- [x] Rapid ranking with a sub-100-question minimum pass and convergence-driven continuation
 - [x] Automatic scenario generation with local, OpenRouter Free, and DeepSeek providers
 - [x] Transactional evidence reset for one value set or the full workspace
 
@@ -59,15 +59,16 @@
    separated from Bayesian convergence.
 9. **Rapid ranking:** Five-value questions capture a complete local ordering as four
    adjacent immutable events. This avoids treating the ten correlated pair relations as
-   ten independent observations. The 100-value default uses 80 adaptive questions and
-   reports remaining uncertainty rather than claiming guaranteed exactness.
+    ten independent observations. The 100-value default pass uses 80 adaptive questions;
+    if configured coverage or convergence remains unmet, targeted questions continue
+    until the goal is reached or the user pauses.
 10. **Scenario providers:** Scenarios are generated from the current values, definitions,
     context, and question purpose. Definition-derived generation is always available;
     optional OpenAI-compatible providers use session-only credentials that are excluded
     from exports and durable storage.
 11. **Portrait scoring:** The scheduler assigns three focal values before asking an LLM
     to verbalize anonymous actions. The user selects the most- and least-self-similar
-    portraits, yielding two conservative relations. The LLM cannot create or revise the
+    portraits, yielding the three logically implied relations. The LLM cannot create or revise the
     hidden scoring key, and the complete stimulus and response remain in the event log.
 
 ## Verification Gates

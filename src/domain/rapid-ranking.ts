@@ -6,6 +6,7 @@ export interface RapidGroup {
   reason: string;
   question: number;
   budget: number;
+  continuing?: boolean;
 }
 
 const pairKey = (a: string, b: string) => [a, b].sort().join(":");
@@ -36,15 +37,22 @@ export function rapidQuestionBudget(size: number, groupSize = 5): number {
   return Math.max(floor, Math.ceil(size * 0.8));
 }
 
+export function portraitQuestionBudget(size: number): number {
+  if (size < 2) return 0;
+  return Math.min(99, Math.max(12, Math.ceil(size * 2)));
+}
+
 export function selectRapidGroup(input: {
   values: RatedValue[];
   events: RatingEvent[];
   seed: string;
   completedQuestions: number;
   groupSize?: number;
+  questionBudget?: number;
+  avoidValueIds?: string[];
 }): RapidGroup | null {
   const groupSize = Math.min(input.groupSize ?? 5, input.values.length);
-  const budget = rapidQuestionBudget(input.values.length, groupSize);
+  const budget = input.questionBudget ?? rapidQuestionBudget(input.values.length, groupSize);
   if (groupSize < 2 || input.completedQuestions >= budget) return null;
 
   const appearances = new Map(input.values.map((value) => [value.id, 0]));
@@ -79,8 +87,9 @@ export function selectRapidGroup(input: {
         )
           ? 0
           : 0.75;
+        const lookaheadPenalty = input.avoidValueIds?.includes(value.id) ? 4 : 0;
         const jitter = (hash(`${input.seed}:${input.completedQuestions}:${value.id}`) % 1000) / 1_000_000;
-        return sparse + uncertainty + proximity + novelPairs + category + jitter;
+        return sparse + uncertainty + proximity + novelPairs + category + jitter - lookaheadPenalty;
       };
       return score(b) - score(a) || a.id.localeCompare(b.id);
     });

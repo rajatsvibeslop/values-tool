@@ -11,9 +11,11 @@ values that lower bound is 525.
 The default product target is instead a high-quality inferred order in fewer than 100
 questions. Direct rapid sessions can ask the user to fully order five values. Hosted
 scenario sessions use a less abstract portrait task: identify the person most and least
-like the user among three controlled actions. The application uses a fixed budget of 80
-and retains uncertainty rather than claiming a worst-case exact guarantee. Portrait mode
-deliberately trades some information per question for lower cognitive load.
+like the user among three controlled actions. Direct mode starts with 80 questions for
+100 values. Portrait mode starts with `max(12, 2n)`, capped at 99, and records the three
+pair relations implied by a best-worst response. These are minimum adaptive passes, not
+hard stops: targeted questions continue when values remain below minimum coverage or the
+configured exact/tier convergence goal is unmet. The user can pause at any point.
 
 The application therefore uses a deterministic binary-insertion scheduler for exact
 ordering sessions. Its worst case for 100 values is 573 decisive comparisons. It is
@@ -48,7 +50,8 @@ Sources:
   as four adjacent relations, not ten falsely independent pairwise observations.
 - **Portrait instrument:** assigns three distinct focal values before generation. The LLM
   verbalizes matched anonymous actions but cannot alter their hidden scoring keys. A
-  most/least response creates two adjacent relations and retains the complete stimulus.
+  most/least response creates all three logically implied relations and retains the
+  complete stimulus.
 - **TrueSkill:** estimates latent strength and posterior uncertainty, including sparse
   contextual rankings.
 - **Verification:** targets adjacent boundaries with weak posterior separation,

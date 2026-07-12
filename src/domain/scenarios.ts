@@ -78,7 +78,7 @@ export function deriveScenario(input: ScenarioRequest): GeneratedScenario {
     ? input.profiles
     : buildScenarioProfiles(input.values, `${input.purpose}:${input.question}`);
   return {
-    text: `In ${context}, three people face the same consequential decision. Each protects something important while accepting a different cost.`,
+    text: `In ${context}, several people face the same consequential decision. Each protects something important while accepting a different cost.`,
     provider: "local",
     model: "definition-derived",
     generatedAt: new Date().toISOString(),
@@ -106,6 +106,13 @@ Requirements:
 - Do not name the values or reveal a preferred answer.
 - Use the supplied definitions, not stereotypes about the labels.
 - Use the context and session purpose when supplied.
+- Establish exactly one shared decision, one set of actors, and one set of facts.
+- Every action must respond to that exact decision. Actions must not introduce any fact,
+  obligation, relationship, hazard, organization, or constraint absent from the scenario.
+- Include every fact needed to understand every action in the shared scenario.
+- Choose a concrete 2-7 word decision anchor (for example "the Sunday project").
+  Include that exact anchor verbatim in the scenario and in every action so coherence is verifiable.
+- Keep the outcome stakes constant across people; vary only which concern guides their response.
 - Write the scenario in 2 concise sentences, under 70 words total.
 - Write ${actionCount} distinct, concrete actions labeled A through ${finalLabel}, each under 24 words.
 - Each action belongs to an anonymous person and must primarily express its assigned focal value.
@@ -113,7 +120,7 @@ Requirements:
 - Vary the value tradeoff, not demographic details, writing style, or how admirable the person sounds.
 - The action text must not reveal value names, value indices, or a preferred answer.
 - Return only JSON in this shape:
-  {"scenario":"...","choices":[{"id":"A","action":"..."}]}.
+  {"scenario":"...","anchor":"the exact shared decision","choices":[{"id":"A","action":"..."}]}.
 
 Context: ${input.contexts.join(", ") || "General life"}
 Purpose: ${input.purpose || "Clarify personal priorities"}
@@ -139,6 +146,7 @@ function scenarioResponseFormat(input: ScenarioRequest & { profiles: ScenarioPro
         additionalProperties: false,
         properties: {
           scenario: { type: "string", minLength: 20, maxLength: 600 },
+          anchor: { type: "string", minLength: 5, maxLength: 80 },
           choices: {
             type: "array",
             minItems: actionCount,
@@ -154,7 +162,7 @@ function scenarioResponseFormat(input: ScenarioRequest & { profiles: ScenarioPro
             },
           },
         },
-        required: ["scenario", "choices"],
+        required: ["scenario", "anchor", "choices"],
       },
     },
   };
@@ -226,6 +234,32 @@ export function extractScenarioChoices(
   }
 }
 
+export function scenarioHasSharedAnchor(content: unknown): boolean {
+  const raw = contentText(content)
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "")
+    .trim();
+  try {
+    const parsed = JSON.parse(raw) as {
+      scenario?: unknown;
+      anchor?: unknown;
+      choices?: unknown;
+    };
+    const anchor = clean(contentText(parsed.anchor)).toLocaleLowerCase();
+    const scenario = clean(contentText(parsed.scenario)).toLocaleLowerCase();
+    if (!anchor || anchor.split(" ").length < 2 || !scenario.includes(anchor)) return false;
+    if (!Array.isArray(parsed.choices) || !parsed.choices.length) return false;
+    return parsed.choices.every((choice) => {
+      if (!choice || typeof choice !== "object") return false;
+      const item = choice as { action?: unknown; text?: unknown };
+      return clean(contentText(item.action ?? item.text)).toLocaleLowerCase().includes(anchor);
+    });
+  } catch {
+    return false;
+  }
+}
+
 export class OpenAICompatibleScenarioProvider implements ScenarioProvider {
   readonly id: string;
   constructor(private readonly config: HostedScenarioConfig) {
@@ -269,10 +303,10 @@ export class OpenAICompatibleScenarioProvider implements ScenarioProvider {
           ? { models: [model, "openrouter/free"] }
           : { model }),
         messages: [
-          { role: "system", content: "You design neutral behavioral decision scenarios for reflective research." },
+          { role: "system", content: "You design tightly controlled factorial-survey vignettes. All portraits must respond to the same stated facts; never splice together separate scenarios." },
           { role: "user", content: scenarioPrompt(request) },
         ],
-        temperature: 0.7,
+        temperature: 0.45,
         // The free router can select a mandatory-reasoning model. Its internal
         // tokens share this budget, so leave room for a short final answer.
         max_tokens: openRouter ? 600 : 400,
@@ -315,6 +349,8 @@ export class OpenAICompatibleScenarioProvider implements ScenarioProvider {
     const choices = extractScenarioChoices(content, request.profiles);
     if (choices.length !== request.profiles.length)
       throw new Error("The hosted model did not produce the required usable actions");
+    if (!scenarioHasSharedAnchor(content))
+      throw new Error("The hosted model produced choices that did not share one decision");
     return {
       text: clean(scenario),
       provider: this.config.provider,

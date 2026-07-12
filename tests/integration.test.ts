@@ -75,10 +75,11 @@ describe("browser repository integration", () => {
     expect(repo.queue(sessionId)).toHaveLength(1);
   });
 
-  it("records a portrait best-worst response as two conservative relations", async () => {
+  it("records a portrait best-worst response as three implied relations", async () => {
     const setId = await repo.importPreset("editable-card-sort");
-    const sessionId = await repo.startSession(setId, "Portrait choices", [], "rapid");
+    const sessionId = await repo.startSession(setId, "Portrait choices", [], "portrait");
     const question = repo.rapidQuestion(sessionId)!;
+    expect(question.budget).toBe(40);
     const focalValues = question.valueIds.slice(0, 3);
     await repo.updateRapidScenario(sessionId, {
       text: "Three colleagues choose different reasonable paths through the same decision.",
@@ -99,11 +100,70 @@ describe("browser repository integration", () => {
       leastChoiceId: "C",
     });
     expect(repo.sessions().find((session) => session.id === sessionId)?.completed_count).toBe(1);
-    expect(repo.history(setId)).toHaveLength(2);
+    expect(repo.history(setId)).toHaveLength(3);
     expect(repo.history(setId)[0]?.tags).toContain("portrait-choice");
     expect(database.query<{ text: string }>("SELECT text FROM comparison_notes WHERE note_type='portrait_most'")[0]?.text).toContain("Person A");
     expect(database.query<{ text: string }>("SELECT text FROM comparison_notes WHERE note_type='portrait_least'")[0]?.text).toContain("Person C");
     expect(repo.rapidQuestion(sessionId)?.question).toBe(2);
+  });
+
+  it("prepares and promotes the next portrait question", async () => {
+    const setId = await repo.importPreset("schwartz-19");
+    const sessionId = await repo.startSession(setId, "Lookahead", [], "portrait");
+    const current = repo.rapidQuestion(sessionId)!;
+    const prepared = await repo.prepareNextRapidQuestion(sessionId);
+    expect(prepared?.question).toBe(2);
+    expect(prepared?.id).not.toBe(current.id);
+    const focal = current.scenario.choices!.slice(0, 3);
+    await repo.submitScenarioPortrait({
+      sessionId,
+      setId,
+      contexts: [],
+      mostChoiceId: focal[0]!.id,
+      leastChoiceId: focal[2]!.id,
+    });
+    expect(repo.rapidQuestion(sessionId)?.id).toBe(prepared?.id);
+    expect(repo.preparedRapidQuestion(sessionId)).toBeNull();
+  });
+
+  it("continues a portrait session past its minimum pass while coverage is insufficient", async () => {
+    const setId = await repo.importPreset("schwartz-19");
+    const sessionId = await repo.startSession(setId, "Coverage pass", [], "portrait");
+    await database.transaction(() => {
+      database.run("UPDATE comparison_sessions SET completed_count=38 WHERE id=?", [sessionId]);
+      database.run("DELETE FROM comparison_queue WHERE session_id=?", [sessionId]);
+      database.run("DELETE FROM application_settings WHERE key IN (?,?)", [
+        `rapid-question:${sessionId}`,
+        `rapid-prepared:${sessionId}`,
+      ]);
+    });
+    await repo.regenerateQueue(sessionId);
+    const question = repo.rapidQuestion(sessionId)!;
+    expect(question.question).toBe(39);
+    expect(question.budget).toBe(38);
+    expect(question.continuing).toBe(true);
+    expect(question.reason).toContain("evidence gap");
+    expect(repo.sessions().find((session) => session.id === sessionId)?.status).toBe("active");
+  });
+
+  it("reopens a completed adaptive session for targeted refinement", async () => {
+    const setId = await repo.importPreset("schwartz-10");
+    const sessionId = await repo.startSession(setId, "Refine me", [], "portrait");
+    await database.transaction(() => {
+      database.run(
+        "UPDATE comparison_sessions SET status='completed',completed_count=20,ended_at=? WHERE id=?",
+        [Date.now(), sessionId],
+      );
+      database.run("DELETE FROM comparison_queue WHERE session_id=?", [sessionId]);
+      database.run("DELETE FROM application_settings WHERE key IN (?,?)", [
+        `rapid-question:${sessionId}`,
+        `rapid-prepared:${sessionId}`,
+      ]);
+    });
+    await repo.resumeSession(sessionId);
+    expect(repo.sessions().find((session) => session.id === sessionId)?.status).toBe("active");
+    expect(repo.rapidQuestion(sessionId)?.question).toBe(21);
+    expect(repo.rapidQuestion(sessionId)?.continuing).toBe(true);
   });
 
   it("resets one value set's evidence without deleting its values", async () => {

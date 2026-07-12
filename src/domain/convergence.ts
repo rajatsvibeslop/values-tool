@@ -39,7 +39,10 @@ export function convergenceDiagnostics(input: {
   let state: ConvergenceDiagnostics["state"] = "more-needed";
   if (contextInstability > 0.35) state = "contexts-unresolved";
   else if (insufficientValues === 0 && averageUncertainty <= config.uncertaintyThreshold && rankCorrelation >= 0.95 && minimumAdjacentOrderProbability >= 0.8) state = "exact-stable";
-  else if (topKStability >= 0.9 && recent.length >= Math.min(2, config.stabilityWindow)) state = unresolvedNearTies > 0 && config.tiersSufficient ? "tiers-stable" : "top-stable";
+  else if (insufficientValues === 0 && topKStability >= 0.9 && recent.length >= Math.min(2, config.stabilityWindow)) {
+    if (unresolvedNearTies === 0) state = "top-stable";
+    else if (config.tiersSufficient) state = "tiers-stable";
+  }
   const explanation = state === "exact-stable" ? "The exact ordering is stable across recent snapshots and adjacent values are well separated."
     : state === "top-stable" ? `The top ${config.topK} membership is stable, but ordering within or below it remains uncertain.`
       : state === "tiers-stable" ? `Broad tiers are stable, while ${unresolvedNearTies} adjacent pair${unresolvedNearTies === 1 ? "" : "s"} still overlap.`

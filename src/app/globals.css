@@ -135,6 +135,13 @@ button, input, textarea, select, summary, a { outline-offset: 2px; }
 .scenario-band p { margin: 5px 0 0; max-width: 900px; font-size: 16px; line-height: 1.45; }
 .scenario-label { font-family: "IBM Plex Mono", monospace; color: var(--muted); font-size: 10px; font-weight: 600; }
 .scenario-loading { min-height: 190px; display: grid; place-items: center; border-top: 2px solid var(--text); }
+.scenario-loading:has(.spin) { display: flex; justify-content: center; gap: 9px; }
+.scenario-pending { align-items: center; }
+.skeleton-line { width: min(560px, 72%); height: 11px; margin-top: 12px; background: var(--surface-2); animation: pulse 1.1s ease-in-out infinite alternate; }
+.skeleton-wide { width: min(820px, 92%); }
+.spin { animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse { to { opacity: .42; } }
 .scenario-actions { display: grid; gap: 12px; }
 .portrait-instruction { min-height: 54px; padding: 8px 12px; display: grid; align-content: center; gap: 3px; border-left: 3px solid var(--accent); background: var(--accent-soft); }
 .portrait-instruction strong { font-size: 14px; }

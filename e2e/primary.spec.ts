@@ -125,6 +125,22 @@ test("exports a self-contained HTML tier report", async ({ page }, testInfo) => 
   expect(report.suggestedFilename()).toMatch(/\.html$/);
 });
 
+test("saves and reloads manual tiers", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "One persistence check is sufficient");
+  await page.locator(".preset-row").filter({ hasText: "Schwartz 10 broad basic values" }).getByRole("button", { name: "Use set" }).click();
+  await page.locator('a[href="#rankings"]').first().click();
+  await page.getByLabel("More ranking views").selectOption("manual");
+  const unplaced = page.locator(".tier-row").filter({ hasText: "Unplaced" });
+  const value = unplaced.locator(".tier-values button").first();
+  const valueName = (await value.textContent())!.trim();
+  await value.dragTo(page.locator(".tier-row").filter({ hasText: /^A/ }));
+  await page.getByRole("button", { name: "Save manual tiers" }).click();
+  await expect(page.getByRole("button", { name: "Manual tiers saved" })).toBeVisible();
+  await page.getByLabel("More ranking views").selectOption("matrix");
+  await page.getByLabel("More ranking views").selectOption("manual");
+  await expect(page.locator(".tier-row").filter({ hasText: /^A/ })).toContainText(valueName);
+});
+
 test("stores hosted scenario credentials only for the browser tab", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "One settings check is sufficient");
   await page.locator('a[href="#settings"]').first().click();
@@ -135,7 +151,7 @@ test("stores hosted scenario credentials only for the browser tab", async ({ pag
   expect(await page.evaluate(() => sessionStorage.getItem("scenario-api-key"))).toBe("test-session-key");
   expect(await page.evaluate(() => localStorage.getItem("scenario-provider"))).toBe("openrouter");
   let scenarioRequests = 0;
-  await page.route("https://openrouter.ai/api/v1/chat/completions", (route) => {
+  await page.route("https://openrouter.ai/api/v1/chat/completions", async (route) => {
     scenarioRequests += 1;
     const body = route.request().postDataJSON() as {
       max_tokens: number;
@@ -154,15 +170,17 @@ test("stores hosted scenario credentials only for the browser tab", async ({ pag
     expect(body.plugins).toEqual([{ id: "response-healing" }]);
     expect(body.provider.require_parameters).toBe(true);
     expect(body.provider.sort).toBe("latency");
+    await new Promise((resolve) => setTimeout(resolve, 300));
     return route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({
-        scenario: "You must choose between a secure familiar role and a risky opportunity to build something meaningful with people you trust.",
+        scenario: "A company makes the career offer: take a secure familiar role or join a risky project with people you trust.",
+        anchor: "the career offer",
         choices: [
-          { id: "A", action: "Accept the secure role and protect time for a smaller independent project." },
-          { id: "B", action: "Join the risky project and create a concrete fallback plan with your collaborators." },
-          { id: "C", action: "Negotiate a short trial that delays the permanent choice until you have direct evidence." },
+          { id: "A", action: "Accept the career offer's secure role and protect time for a smaller independent project." },
+          { id: "B", action: "Take the career offer's risky project and create a concrete fallback plan with collaborators." },
+          { id: "C", action: "Negotiate the career offer into a short trial before making the choice permanent." },
         ],
       }) } }] }),
     });
@@ -171,15 +189,17 @@ test("stores hosted scenario credentials only for the browser tab", async ({ pag
   await page.getByLabel("Value set").selectOption("preset:schwartz-10");
   await page.getByLabel("Session name").fill("Generated scenarios");
   await page.getByRole("button", { name: "Start session" }).click();
+  await expect(page.getByText("GENERATING DECISION")).toBeVisible();
   await expect(page.getByText(/secure familiar role/)).toBeVisible();
   await expect(page.locator(".scenario-choice")).toHaveCount(3);
+  await expect.poll(() => scenarioRequests).toBeGreaterThanOrEqual(2);
   await page.getByRole("button", { name: "None fit" }).click();
-  await expect.poll(() => scenarioRequests).toBe(2);
-  await expect(page.getByText("1/8", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: /Accept the secure role/ }).click();
+  await expect.poll(() => scenarioRequests).toBeGreaterThanOrEqual(3);
+  await expect(page.getByText("1/20", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /Accept the career offer/ }).click();
   await expect(page.getByText("Who is least like you?")).toBeVisible();
-  await page.getByRole("button", { name: /Negotiate a short trial/ }).click();
-  await expect(page.getByText("2/8", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /Negotiate the career offer/ }).click();
+  await expect(page.getByText("2/20", { exact: true })).toBeVisible();
 });
 
 test("resets ranking evidence while preserving the value set", async ({ page }, testInfo) => {

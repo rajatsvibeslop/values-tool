@@ -57,6 +57,38 @@ describe("analysis diagnostics", () => {
     expect(result.explanation).toContain("tiers");
   });
 
+  it("keeps collecting evidence when exact order is requested and tiers overlap", () => {
+    const values = ["a", "b", "c"].map((id, index) => ({
+      id,
+      name: id,
+      parentCategory: "x",
+      aliases: [],
+      rating: {
+        ...initialRating(config),
+        mu: 30 - index * 0.2,
+        sigma: 2,
+        comparisons: 8,
+      },
+    }));
+    const result = convergenceDiagnostics({
+      values,
+      recentRankings: [
+        ["a", "b", "c"],
+        ["a", "b", "c"],
+      ],
+      config: {
+        topK: 2,
+        minimumComparisons: 5,
+        stabilityWindow: 2,
+        uncertaintyThreshold: 3,
+        tiersSufficient: false,
+      },
+      suspectedContradictions: 0,
+    });
+    expect(result.unresolvedNearTies).toBeGreaterThan(0);
+    expect(result.state).toBe("more-needed");
+  });
+
   it("detects preference cycles", () => {
     const events = [
       event({ id: "ab", leftValueId: "a", rightValueId: "b", result: "left" }),

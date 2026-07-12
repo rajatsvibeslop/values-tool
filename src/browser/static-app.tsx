@@ -103,9 +103,19 @@ export function StaticApp() {
     BrowserDatabase.create()
       .then(async (database) => {
         const repository = new BrowserRepository(database);
-        for (const session of repository
-          .sessions()
-          .filter((item) => item.status !== "completed")) {
+        for (const session of repository.sessions()) {
+          if (
+            localStorage.getItem("scenario-provider") &&
+            localStorage.getItem("scenario-provider") !== "local" &&
+            repository.sessionMode(session.id) === "rapid"
+          )
+            await database.transaction(() =>
+              database.run(
+                "UPDATE application_settings SET value=?,updated_at=? WHERE key=?",
+                [JSON.stringify("portrait"), Date.now(), `session-mode:${session.id}`],
+              ),
+            );
+          if (session.status === "completed") continue;
           const automatic = repository
             .queue(session.id)
             .filter((item) => item.reason !== "Manual comparison");
@@ -379,9 +389,14 @@ function Dashboard({ repo, db, mutate }: ViewProps) {
   const values = repo.values(set.id);
   const ratings = repo.orderedRatings(set.id);
   const sessions = repo.sessions();
+  const setSessions = sessions.filter((session) => session.value_set_id === set.id);
+  const resumableSession = setSessions.find((session) => session.status !== "completed");
+  const completedAdaptiveSession = setSessions.find(
+    (session) =>
+      session.status === "completed" && repo.sessionMode(session.id) !== "exact",
+  );
   const history = repo.history(set.id);
   const exactRanking = repo.exactRanking(set.id);
-  const rapidRanking = repo.rapidRanking(set.id);
   const settings = repo.settings();
   const snapshots = db.query<{ id: string }>(
     "SELECT id FROM rating_snapshots WHERE value_set_id=? ORDER BY created_at DESC LIMIT ?",
@@ -499,21 +514,17 @@ function Dashboard({ repo, db, mutate }: ViewProps) {
             <span className="badge badge-accent">
               {exactRanking?.complete
                 ? "order complete"
-                : rapidRanking?.complete
-                  ? "rapid pass complete"
                 : diagnostics.state.replaceAll("-", " ")}
             </span>
             <p>
               {exactRanking?.complete
                 ? `All ${exactRanking.total} values are placed. Interval overlap shows which boundaries still merit verification.`
-                : rapidRanking?.complete
-                  ? `${rapidRanking.questions} five-value questions completed. Review intervals and retest unresolved boundaries.`
                 : diagnostics.explanation}
             </p>
             <div className="progress">
               <span
                 style={{
-                  width: exactRanking?.complete || rapidRanking?.complete
+                  width: exactRanking?.complete
                     ? "100%"
                     : `${Math.round(diagnostics.topKStability * 100)}%`,
                 }}
@@ -521,14 +532,22 @@ function Dashboard({ repo, db, mutate }: ViewProps) {
             </div>
           </Panel>
           <Panel title="Resume work">
-            {sessions.find((session) => session.status !== "completed") ? (
+            {resumableSession ? (
               <a className="btn btn-primary" href="#compare">
-                Resume{" "}
-                {
-                  sessions.find((session) => session.status !== "completed")!
-                    .name
-                }
+                Resume {resumableSession.name}
               </a>
+            ) : completedAdaptiveSession &&
+              (diagnostics.insufficientValues > 0 ||
+                ["more-needed", "contexts-unresolved"].includes(diagnostics.state)) ? (
+              <button
+                className="btn btn-primary"
+                onClick={async () => {
+                  await mutate(() => repo.resumeSession(completedAdaptiveSession.id));
+                  location.hash = "#compare";
+                }}
+              >
+                Continue until stable
+              </button>
             ) : (
               <a className="btn" href="#compare">
                 Start a session
@@ -1052,7 +1071,7 @@ function Compare({ repo, db, mutate }: ViewProps) {
     : sessions.find((item) => item.id === sessionId);
   const queue = session ? repo.queue(session.id) : [];
   const activeMode = session ? repo.sessionMode(session.id) : sessionMode;
-  const rapidQuestion = session && activeMode === "rapid" ? repo.rapidQuestion(session.id) : null;
+  const rapidQuestion = session && activeMode !== "exact" ? repo.rapidQuestion(session.id) : null;
   const exactProgress = session ? repo.exactProgress(session.id) : null;
   const pair = queue[0];
   const values = session ? repo.values(session.value_set_id) : [];
@@ -1108,7 +1127,9 @@ function Compare({ repo, db, mutate }: ViewProps) {
                       selectedSetId,
                       String(data.get("name")),
                       data.getAll("contexts").map(String),
-                      sessionMode,
+                      sessionMode === "rapid" && scenarioConfig().provider !== "local"
+                        ? "portrait"
+                        : sessionMode,
                     );
                     localStorage.setItem("values-set", selectedSetId);
                     setNewSetId(selectedSetId);
@@ -1209,10 +1230,10 @@ function Compare({ repo, db, mutate }: ViewProps) {
         </div>
       </Page>
     );
-  if (activeMode === "rapid" && rapidQuestion)
+  if (activeMode !== "exact" && rapidQuestion)
     return (
       <RapidCompare
-        key={rapidQuestion.id}
+        key={`${rapidQuestion.id}:${rapidQuestion.scenario.generatedAt}`}
         repo={repo}
         db={db}
         mutate={mutate}
@@ -1240,14 +1261,26 @@ function Compare({ repo, db, mutate }: ViewProps) {
       >
         <Panel title={exactProgress?.complete || session.status === "completed" ? "Ranking ready" : "Next comparison"}>
           {exactProgress?.complete || session.status === "completed" ? (
-            <div className="spread">
+            <div className="spread" style={{ flexWrap: "wrap", gap: 12 }}>
               <div>
                 <strong>{values.length} values ranked</strong>
-                <div className="small muted">Review tiers and interval overlap.</div>
+                <div className="small muted">
+                  Review tiers, or keep collecting targeted evidence.
+                </div>
               </div>
-              <a className="btn btn-primary" href="#rankings">
-                View ranking
-              </a>
+              <div className="row">
+                {activeMode !== "exact" && (
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => mutate(() => repo.resumeSession(session.id))}
+                  >
+                    <RefreshCw size={15} /> Continue until stable
+                  </button>
+                )}
+                <a className="btn" href="#rankings">
+                  View ranking
+                </a>
+              </div>
             </div>
           ) : (
             <button
@@ -1558,12 +1591,16 @@ function RapidCompare({
   const [order, setOrder] = useState(question.valueIds);
   const [scenario, setScenario] = useState(question.scenario);
   const [scenarioError, setScenarioError] = useState("");
-  const [generating, setGenerating] = useState(false);
+  const [generating, setGenerating] = useState(
+    () => scenarioConfig().provider !== "local" && question.scenario.provider === "local",
+  );
+  const [replacingScenario, setReplacingScenario] = useState(false);
   const [notes, setNotes] = useState(false);
   const [mostChoiceId, setMostChoiceId] = useState("");
   const [choosing, setChoosing] = useState(false);
   const attempted = useRef("");
   const interactionStarted = useRef(false);
+  const prefetching = useRef("");
   const sessionContextIds = db
     .query<{ context_id: string }>(
       "SELECT context_id FROM session_contexts WHERE session_id=?",
@@ -1573,6 +1610,25 @@ function RapidCompare({
   const contextNames = contexts
     .filter((context) => sessionContextIds.includes(context.id))
     .map((context) => context.name);
+
+  const scenarioRequest = (target: RapidQuestion) => ({
+    values: target.valueIds.map((id) => values.find((value) => value.id === id)!).map((value) => ({
+      id: value.id,
+      name: value.name,
+      definition: value.personal_definition || value.short_definition,
+      category: value.parent_category,
+    })),
+    contexts: contextNames,
+    purpose: session.name,
+    question: target.question,
+  });
+
+  const scenarioProvider = (config: ScenarioConfig) =>
+    new OpenAICompatibleScenarioProvider({
+      provider: config.provider as HostedScenarioProvider,
+      apiKey: config.apiKey,
+      model: config.model,
+    });
 
   const generateScenario = async (automatic = false) => {
     const config = scenarioConfig();
@@ -1586,24 +1642,10 @@ function RapidCompare({
       setMostChoiceId("");
     }
     setGenerating(true);
+    if (!automatic) setReplacingScenario(true);
     setScenarioError("");
     try {
-      const provider = new OpenAICompatibleScenarioProvider({
-        provider: config.provider,
-        apiKey: config.apiKey,
-        model: config.model,
-      });
-      const generated = await provider.generate({
-        values: questionValues.map((value) => ({
-          id: value.id,
-          name: value.name,
-          definition: value.personal_definition || value.short_definition,
-          category: value.parent_category,
-        })),
-        contexts: contextNames,
-        purpose: session.name,
-        question: question.question,
-      });
+      const generated = await scenarioProvider(config).generate(scenarioRequest(question));
       if (!interactionStarted.current) {
         await repo.updateRapidScenario(session.id, generated, question.id);
         if (!interactionStarted.current) setScenario(generated);
@@ -1615,23 +1657,44 @@ function RapidCompare({
         setScenarioError(`${message}. The current choices are still available.`);
     } finally {
       setGenerating(false);
+      setReplacingScenario(false);
+    }
+  };
+
+  const prefetchNextScenario = async () => {
+    const config = scenarioConfig();
+    if (config.provider === "local" || !config.apiKey) return;
+    const prepared = await repo.prepareNextRapidQuestion(session.id);
+    if (!prepared || prepared.scenario.provider !== "local" || prefetching.current === prepared.id)
+      return;
+    prefetching.current = prepared.id;
+    try {
+      const generated = await scenarioProvider(config).generate(scenarioRequest(prepared));
+      await mutate(() => repo.updatePreparedRapidScenario(session.id, prepared.id, generated));
+    } catch {
+      // The prepared local portrait remains usable if hosted prefetching fails.
     }
   };
 
   useEffect(() => {
     const config = scenarioConfig();
     const requestKey = `scenario-portraits:v5:${question.id}`;
-    if (
+    const needsCurrentScenario =
       config.provider !== "local" &&
       config.apiKey &&
       (scenario.provider === "local" ||
         (scenario.choices?.filter((choice) => choice.focalValueId).length ?? 0) < 2) &&
       attempted.current !== question.id &&
-      !sessionStorage.getItem(requestKey)
-    ) {
+      !sessionStorage.getItem(requestKey);
+    if (needsCurrentScenario) {
       attempted.current = question.id;
       sessionStorage.setItem(requestKey, "started");
-      void generateScenario(true);
+      void (async () => {
+        await generateScenario(true);
+        await prefetchNextScenario();
+      })();
+    } else {
+      void prefetchNextScenario();
     }
     // The request is keyed in sessionStorage; rerunning for other state is unnecessary.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1661,6 +1724,9 @@ function RapidCompare({
   );
   const hostedScenarioMode = scenarioConfig().provider !== "local";
   const useScenarioChoices = hostedScenarioMode && scenarioChoices.length >= 2;
+  const awaitingHostedScenario =
+    hostedScenarioMode &&
+    (replacingScenario || (generating && scenario.provider === "local"));
   const mostChoice = scenarioChoices.find((choice) => choice.id === mostChoiceId);
   const visibleScenarioChoices = mostChoice
     ? scenarioChoices.filter((choice) => choice.id !== mostChoice.id)
@@ -1692,7 +1758,11 @@ function RapidCompare({
       description={question.reason}
       actions={
         <div className="row">
-          <span className="badge">{question.question}/{question.budget}</span>
+          <span className="badge">
+            {question.continuing
+              ? `Targeted question ${question.question}`
+              : `${question.question}/${question.budget}`}
+          </span>
           <button className="btn" onClick={onNewSession}>
             <Plus size={14} /> New session
           </button>
@@ -1713,7 +1783,11 @@ function RapidCompare({
     >
       <div className="ordering-strip rapid-strip">
         <div>
-          <span className="ordering-label">QUESTION {question.question} OF {question.budget}</span>
+          <span className="ordering-label">
+            {question.continuing
+              ? `TARGETED QUESTION ${question.question}`
+              : `QUESTION ${question.question} OF ${question.budget}`}
+          </span>
           <strong>
             {hostedScenarioMode
               ? mostChoiceId
@@ -1723,21 +1797,46 @@ function RapidCompare({
           </strong>
         </div>
         <div className="ordering-progress">
-          <span style={{ width: `${((question.question - 1) / question.budget) * 100}%` }} />
+          <span
+            style={{
+              width: question.continuing
+                ? "100%"
+                : `${((question.question - 1) / question.budget) * 100}%`,
+            }}
+          />
         </div>
-        <span className="mono muted">{hostedScenarioMode ? "most + least" : "5 at a time"}</span>
+        <span className="mono muted">
+          {question.continuing
+            ? "until stable"
+            : hostedScenarioMode
+              ? "most + least"
+              : "5 at a time"}
+        </span>
       </div>
-      <section className="scenario-band" aria-live="polite">
-        <Sparkles size={18} />
-        <div>
-          <span className="scenario-label">
-            DECISION SCENARIO
-          </span>
-          <p>{scenario.text}</p>
-          {scenarioError && <div className="small badge-danger">{scenarioError}</div>}
+      {awaitingHostedScenario ? (
+        <section className="scenario-band scenario-pending" aria-busy="true" aria-live="polite">
+          <RefreshCw className="spin" size={18} />
+          <div>
+            <span className="scenario-label">GENERATING DECISION</span>
+            <div className="skeleton-line skeleton-wide" />
+            <div className="skeleton-line" />
+          </div>
+        </section>
+      ) : (
+        <section className="scenario-band" aria-live="polite">
+          <Sparkles size={18} />
+          <div>
+            <span className="scenario-label">DECISION SCENARIO</span>
+            <p>{scenario.text}</p>
+            {scenarioError && <div className="small badge-danger">{scenarioError}</div>}
+          </div>
+        </section>
+      )}
+      {awaitingHostedScenario ? (
+        <div className="scenario-loading muted" aria-busy="true">
+          <RefreshCw className="spin" size={20} /> Preparing people and choices…
         </div>
-      </section>
-      {useScenarioChoices ? (
+      ) : useScenarioChoices ? (
         <section className="scenario-actions" aria-label="Possible actions">
           <div className="portrait-instruction" aria-live="polite">
             <span className="scenario-label">STEP {mostChoice ? "2" : "1"} OF 2</span>
@@ -2210,7 +2309,7 @@ function Rankings(props: ViewProps) {
   );
 }
 
-function LocalRankings({ repo, db }: ViewProps) {
+function LocalRankings({ repo, db, mutate }: ViewProps) {
   const { sets, set, select } = useSelectedSet(repo);
   const contexts = repo.contexts();
   const [context, setContext] = useState("");
@@ -2455,7 +2554,13 @@ function LocalRankings({ repo, db }: ViewProps) {
           <Diagnostics repo={repo} db={db} setId={set.id} rows={rows} />
         )}
         {view === "manual" && (
-          <ManualTierBrowser db={db} setId={set.id} values={values} />
+          <ManualTierBrowser
+            key={set.id}
+            db={db}
+            setId={set.id}
+            values={values}
+            mutate={mutate}
+          />
         )}
       </div>
     </Page>
@@ -2792,27 +2897,54 @@ function ManualTierBrowser({
   db,
   setId,
   values,
+  mutate,
 }: {
   db: BrowserDatabase;
   setId: string;
   values: ValueRow[];
+  mutate: ViewProps["mutate"];
 }) {
-  const [tiers, setTiers] = useState(
-    ["A", "B", "C", "Unplaced"].map((name, index) => ({
-      name,
-      ids: index === 3 ? values.map((value) => value.id) : ([] as string[]),
-    })),
-  );
-  const drop = (id: string, target: number) =>
-    setTiers((all) =>
-      all.map((tier, index) => ({
-        ...tier,
-        ids:
-          index === target
-            ? [...tier.ids.filter((value) => value !== id), id]
-            : tier.ids.filter((value) => value !== id),
-      })),
+  const [saved, setSaved] = useState(false);
+  const [tiers, setTiers] = useState(() => {
+    const stored = db.query<{ id: string; name: string; position: number }>(
+      "SELECT id,name,position FROM manual_tiers WHERE value_set_id=? ORDER BY position",
+      [setId],
     );
+    if (!stored.length)
+      return ["A", "B", "C", "Unplaced"].map((name, index) => ({
+        name,
+        ids: index === 3 ? values.map((value) => value.id) : ([] as string[]),
+      }));
+    const activeIds = new Set(values.map((value) => value.id));
+    const assigned = new Set<string>();
+    const restored = stored.map((tier) => {
+      const ids = db
+        .query<{ value_id: string }>(
+          "SELECT value_id FROM manual_tier_values WHERE tier_id=? ORDER BY position",
+          [tier.id],
+        )
+        .map((row) => row.value_id)
+        .filter((id) => activeIds.has(id) && !assigned.has(id));
+      ids.forEach((id) => assigned.add(id));
+      return { name: tier.name, ids };
+    });
+    const missing = values.map((value) => value.id).filter((id) => !assigned.has(id));
+    const unplaced = restored.find((tier) => tier.name === "Unplaced");
+    if (unplaced) unplaced.ids.push(...missing);
+    else restored.push({ name: "Unplaced", ids: missing });
+    return restored;
+  });
+  const drop = (id: string, target: number) =>
+    setTiers((all) => {
+      setSaved(false);
+      return all.map((tier, index) => ({
+          ...tier,
+          ids:
+            index === target
+              ? [...tier.ids.filter((value) => value !== id), id]
+              : tier.ids.filter((value) => value !== id),
+        }));
+    });
   return (
     <>
       <div className="notice">
@@ -2847,9 +2979,11 @@ function ManualTierBrowser({
         ))}
       </div>
       <button
-        className="btn"
+        className="btn btn-primary"
+        type="button"
         onClick={() =>
-          db.transaction(() => {
+          mutate(async () => {
+            await db.transaction(() => {
             db.query<{ id: string }>(
               "SELECT id FROM manual_tiers WHERE value_set_id=?",
               [setId],
@@ -2914,10 +3048,13 @@ function ManualTierBrowser({
                 valueId,
               ]);
             });
+            });
+            setSaved(true);
           })
         }
       >
-        Save manual tiers
+        {saved ? <Check size={15} /> : null}
+        {saved ? "Manual tiers saved" : "Save manual tiers"}
       </button>
     </>
   );

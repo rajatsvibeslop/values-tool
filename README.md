@@ -100,15 +100,19 @@ of those values become hidden portrait assignments; without one, the user can di
 arrange the five values. Direct ordering contains more information per question, while
 portrait choices reduce abstraction and cognitive load:
 
-- A 100-value session has a fixed budget of 80 questions.
+- Direct five-value ordering starts with 80 questions for 100 values. Portrait sessions
+  start with `max(12, 2n)` questions, capped at 99; the refined 19-value preset therefore
+  starts with 38.
 - Selection balances sparse coverage, posterior uncertainty, similar estimated strength,
   novel pair coverage, and category diversity.
 - A direct order becomes four adjacent immutable events. A portrait best-worst response
-  becomes two adjacent relations among three preassigned focal values.
+  records all three relations logically implied among its three preassigned focal values.
 - A stable synthetic 100-value preference recovers a rank correlation above 0.9 within
   the budget in the automated domain test.
-- Completion means the rapid pass is finished, not that every adjacent relation is
-  certain. Tiers, intervals, and the relation matrix expose remaining ambiguity.
+- The initial count is a minimum pass, not a hard stop. If values remain below configured
+  coverage or the requested exact/tier convergence goal is unmet, matchmaking continues
+  with targeted questions. A completed adaptive session can also be reopened with
+  **Continue until stable**. Tiers, intervals, and the relation matrix expose ambiguity.
 
 This design follows the result that ranked top-m feedback from subset-wise questions can
 reduce sample complexity relative to pairwise feedback. See Saha and Gopalan,
@@ -141,9 +145,14 @@ are removed when the tab is closed, and never enter SQLite, backups, exports, or
 links. The scenario, every portrait, most/least response, provider, and model are
 preserved as evidence with the answer.
 
+All portraits are constrained to the same actors, facts, stakes, and decision. An action
+may not introduce a private obligation, hazard, relationship, or other fact absent from
+the shared scenario; **None fit** discards a bad stimulus without recording evidence.
+
 Question navigation never requires a generation click. A deterministic local portrait is
-available immediately while hosted wording is requested in the background. Slow or failed
-hosted requests therefore do not block the instrument or require manual recovery.
+available as a failure fallback. Normal hosted sessions display an explicit loading state;
+the next adaptive portrait is selected and generated while the current question is being
+answered, so it is normally ready before navigation.
 
 ## Exact Ordering and Adaptive Verification
 

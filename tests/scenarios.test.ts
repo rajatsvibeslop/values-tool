@@ -5,6 +5,7 @@ import {
   extractScenarioChoices,
   extractScenarioText,
   OpenAICompatibleScenarioProvider,
+  scenarioHasSharedAnchor,
 } from "@/domain/scenarios";
 
 const request = {
@@ -54,16 +55,36 @@ describe("definition-derived scenarios", () => {
     );
   });
 
+  it("rejects portraits that splice unrelated decisions together", () => {
+    expect(scenarioHasSharedAnchor(JSON.stringify({
+      scenario: "A firm offers the Sunday project, which conflicts with a standing commitment.",
+      anchor: "the Sunday project",
+      choices: [
+        { id: "A", action: "Decline the Sunday project and keep the commitment." },
+        { id: "B", action: "Refuse a promotion because its product has safety flaws." },
+      ],
+    }))).toBe(false);
+    expect(scenarioHasSharedAnchor(JSON.stringify({
+      scenario: "A firm offers the Sunday project, which conflicts with a standing commitment.",
+      anchor: "the Sunday project",
+      choices: [
+        { id: "A", action: "Decline the Sunday project and keep the commitment." },
+        { id: "B", action: "Accept the Sunday project and arrange substitute coverage." },
+      ],
+    }))).toBe(true);
+  });
+
   it("disables DeepSeek thinking so the output budget reaches final content", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
           model: "deepseek-v4-flash",
           choices: [{ finish_reason: "stop", message: { content: JSON.stringify({
-            scenario: "A promotion offers security but leaves little time for meaningful creative work.",
+            scenario: "The promotion offers security but leaves little time for meaningful creative work.",
+            anchor: "the promotion",
             choices: [
-              { id: "A", action: "Accept the dependable role and protect a weekly block for experimentation." },
-              { id: "B", action: "Pursue the uncertain opportunity with a clear financial fallback." },
+              { id: "A", action: "Accept the promotion and protect a weekly block for experimentation." },
+              { id: "B", action: "Decline the promotion and pursue uncertain work with a financial fallback." },
             ],
           }) } }],
         }),
@@ -78,9 +99,14 @@ describe("definition-derived scenarios", () => {
 
     const result = await provider.generate(request);
     const init = fetchMock.mock.calls[0]![1] as RequestInit;
-    const body = JSON.parse(String(init.body)) as { thinking: unknown; max_tokens: number };
+    const body = JSON.parse(String(init.body)) as {
+      thinking: unknown;
+      max_tokens: number;
+      messages: { content: string }[];
+    };
     expect(body.thinking).toEqual({ type: "disabled" });
     expect(body.max_tokens).toBe(400);
+    expect(body.messages[1]?.content).toContain("must not introduce any fact");
     expect(result.text).toContain("promotion offers security");
     expect(result.choices).toHaveLength(2);
     expect(new Set(result.choices?.map((choice) => choice.focalValueId)).size).toBe(2);

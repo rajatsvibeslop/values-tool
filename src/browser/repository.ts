@@ -9,10 +9,12 @@ import { detectTensions, type TensionSuggestion } from "@/domain/tensions";
 import type { Rating, RatingEvent } from "@/domain/types";
 import {
   adjacentDecisions,
+  portraitQuestionBudget,
   rapidQuestionBudget,
   selectRapidGroup,
 } from "@/domain/rapid-ranking";
 import { deriveScenario, type GeneratedScenario } from "@/domain/scenarios";
+import { convergenceDiagnostics, type ConvergenceDiagnostics } from "@/domain/convergence";
 import { DEFAULT_SETTINGS } from "@/db/defaults";
 import type { BrowserDatabase } from "./database";
 import schwartz10 from "../../data/presets/schwartz-10.json";
@@ -139,6 +141,7 @@ export interface RapidQuestion {
   reason: string;
   question: number;
   budget: number;
+  continuing?: boolean;
   scenario: GeneratedScenario;
 }
 
@@ -204,14 +207,15 @@ export class BrowserRepository {
     );
   }
 
-  sessionMode(sessionId: string): "exact" | "rapid" {
+  sessionMode(sessionId: string): "exact" | "rapid" | "portrait" {
     const row = this.db.one<{ value: string }>(
       "SELECT value FROM application_settings WHERE key=?",
       [`session-mode:${sessionId}`],
     );
-    return row && parsed<"exact" | "rapid">(row.value, "exact") === "rapid"
-      ? "rapid"
+    const mode = row
+      ? parsed<"exact" | "rapid" | "portrait">(row.value, "exact")
       : "exact";
+    return mode === "rapid" || mode === "portrait" ? mode : "exact";
   }
 
   rapidQuestion(sessionId: string): RapidQuestion | null {
@@ -237,6 +241,57 @@ export class BrowserRepository {
         [json({ ...question, scenario }), now(), `rapid-question:${sessionId}`],
       ),
     );
+  }
+
+  preparedRapidQuestion(sessionId: string): RapidQuestion | null {
+    const row = this.db.one<{ value: string }>(
+      "SELECT value FROM application_settings WHERE key=?",
+      [`rapid-prepared:${sessionId}`],
+    );
+    return row ? parsed<RapidQuestion | null>(row.value, null) : null;
+  }
+
+  async prepareNextRapidQuestion(sessionId: string): Promise<RapidQuestion | null> {
+    const existing = this.preparedRapidQuestion(sessionId);
+    if (existing) return existing;
+    const session = this.db.one<SessionRow>(
+      "SELECT * FROM comparison_sessions WHERE id=?",
+      [sessionId],
+    );
+    const current = this.rapidQuestion(sessionId);
+    if (!session || !current || current.question >= current.budget) return null;
+    const prepared = this.buildRapidQuestion(
+      session,
+      session.completed_count + 1,
+      current.valueIds,
+    );
+    if (!prepared) return null;
+    await this.db.transaction(() =>
+      this.db.run(
+        "INSERT INTO application_settings(key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at",
+        [`rapid-prepared:${sessionId}`, json(prepared), now()],
+      ),
+    );
+    return prepared;
+  }
+
+  async updatePreparedRapidScenario(
+    sessionId: string,
+    expectedQuestionId: string,
+    scenario: GeneratedScenario,
+  ): Promise<void> {
+    const prepared = this.preparedRapidQuestion(sessionId);
+    if (prepared?.id === expectedQuestionId) {
+      await this.db.transaction(() =>
+        this.db.run("UPDATE application_settings SET value=?,updated_at=? WHERE key=?", [
+          json({ ...prepared, scenario }),
+          now(),
+          `rapid-prepared:${sessionId}`,
+        ]),
+      );
+      return;
+    }
+    await this.updateRapidScenario(sessionId, scenario, expectedQuestionId);
   }
 
   private sessionContexts(sessionId: string): string[] {
@@ -809,7 +864,7 @@ export class BrowserRepository {
     setId: string,
     name: string,
     contextIds: string[],
-    mode: "exact" | "rapid" = "exact",
+    mode: "exact" | "rapid" | "portrait" = "exact",
   ): Promise<string> {
     const id = uid();
     const stamp = now();
@@ -820,7 +875,11 @@ export class BrowserRepository {
         [
           id,
           name,
-          mode === "rapid" ? "Rapid five-value ranking" : "Exact ordering session",
+          mode === "portrait"
+            ? "Adaptive portrait choices"
+            : mode === "rapid"
+              ? "Rapid five-value ranking"
+              : "Exact ordering session",
           setId,
           "active",
           stamp,
@@ -848,13 +907,32 @@ export class BrowserRepository {
     return id;
   }
 
+  async resumeSession(sessionId: string): Promise<void> {
+    const session = this.db.one<SessionRow>(
+      "SELECT * FROM comparison_sessions WHERE id=?",
+      [sessionId],
+    );
+    if (!session) throw new Error("Session not found");
+    await this.db.transaction(() => {
+      const stamp = now();
+      this.db.run(
+        "UPDATE comparison_sessions SET status='active',ended_at=NULL,after_snapshot_id=NULL,updated_at=? WHERE id=?",
+        [stamp, sessionId],
+      );
+      this.db.run("DELETE FROM application_settings WHERE key=?", [
+        `rapid-ranking:${session.value_set_id}:${this.exactScope(sessionId)}`,
+      ]);
+    });
+    await this.regenerateQueue(sessionId);
+  }
+
   async regenerateQueue(sessionId: string): Promise<void> {
     const session = this.db.one<SessionRow>(
       "SELECT * FROM comparison_sessions WHERE id=?",
       [sessionId],
     );
     if (!session) throw new Error("Session not found");
-    if (this.sessionMode(sessionId) === "rapid") {
+    if (this.sessionMode(sessionId) !== "exact") {
       await this.regenerateRapidQueue(session);
       return;
     }
@@ -907,8 +985,22 @@ export class BrowserRepository {
     });
   }
 
-  private async regenerateRapidQueue(session: SessionRow): Promise<void> {
+  private buildRapidQuestion(
+    session: SessionRow,
+    completedQuestions: number,
+    avoidValueIds: string[] = [],
+  ): RapidQuestion | null {
     const values = this.values(session.value_set_id);
+    const portraitMode = this.sessionMode(session.id) === "portrait";
+    const minimumBudget = portraitMode
+      ? portraitQuestionBudget(values.length)
+      : rapidQuestionBudget(values.length);
+    const diagnostics = this.sessionConvergence(session.id);
+    const targetReached =
+      diagnostics.insufficientValues === 0 &&
+      !["more-needed", "contexts-unresolved"].includes(diagnostics.state);
+    const continuing = completedQuestions >= minimumBudget && !targetReached;
+    const questionBudget = continuing ? completedQuestions + 1 : minimumBudget;
     const settings = this.settings();
     const ratings = this.ratings(session.value_set_id);
     const contexts = this.sessionContexts(session.id);
@@ -935,37 +1027,24 @@ export class BrowserRepository {
       })),
       events: relevantEvents,
       seed: `${session.value_set_id}:${this.exactScope(session.id)}`,
-      completedQuestions: session.completed_count,
+      completedQuestions,
+      questionBudget,
+      avoidValueIds,
     });
-    const stamp = now();
-    if (!group) {
-      await this.db.transaction(() => {
-        this.db.run("DELETE FROM comparison_queue WHERE session_id=?", [session.id]);
-        this.db.run("DELETE FROM application_settings WHERE key=?", [
-          `rapid-question:${session.id}`,
-        ]);
-        const scope = this.exactScope(session.id);
-        this.db.run(
-          "INSERT INTO application_settings(key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at",
-          [
-            `rapid-ranking:${session.value_set_id}:${scope}`,
-            json({ complete: true, questions: session.completed_count, budget: rapidQuestionBudget(values.length), sessionId: session.id }),
-            stamp,
-          ],
-        );
-        this.db.run(
-          "UPDATE comparison_sessions SET status='completed',ended_at=?,after_snapshot_id=?,updated_at=? WHERE id=?",
-          [stamp, this.snapshot(session.value_set_id, "rapid-ranking-complete", null), stamp, session.id],
-        );
-      });
-      return;
-    }
+    if (!group) return null;
     const groupValues = group.valueIds.map((id) => values.find((value) => value.id === id)!);
     const contextNames = this.contexts()
       .filter((context) => contexts.includes(context.id))
       .map((context) => context.name);
-    const question: RapidQuestion = {
+    return {
       ...group,
+      budget: minimumBudget,
+      continuing,
+      reason: continuing
+        ? diagnostics.insufficientValues > 0
+          ? `Close ${diagnostics.insufficientValues} evidence gap${diagnostics.insufficientValues === 1 ? "" : "s"}`
+          : "Resolve remaining ranking uncertainty"
+        : group.reason,
       sessionId: session.id,
       scenario: deriveScenario({
         values: groupValues.map((value) => ({
@@ -979,16 +1058,106 @@ export class BrowserRepository {
         question: group.question,
       }),
     };
+  }
+
+  private async regenerateRapidQueue(session: SessionRow): Promise<void> {
+    const values = this.values(session.value_set_id);
+    const portraitMode = this.sessionMode(session.id) === "portrait";
+    const questionBudget = portraitMode
+      ? portraitQuestionBudget(values.length)
+      : rapidQuestionBudget(values.length);
+    const prepared = this.preparedRapidQuestion(session.id);
+    const group = prepared?.question === session.completed_count + 1
+      ? prepared
+      : this.buildRapidQuestion(session, session.completed_count);
+    const stamp = now();
+    if (!group) {
+      await this.db.transaction(() => {
+        this.db.run("DELETE FROM comparison_queue WHERE session_id=?", [session.id]);
+        this.db.run("DELETE FROM application_settings WHERE key=?", [
+          `rapid-question:${session.id}`,
+        ]);
+        this.db.run("DELETE FROM application_settings WHERE key=?", [
+          `rapid-prepared:${session.id}`,
+        ]);
+        const scope = this.exactScope(session.id);
+        this.db.run(
+          "INSERT INTO application_settings(key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at",
+          [
+            `rapid-ranking:${session.value_set_id}:${scope}`,
+            json({ complete: true, questions: session.completed_count, budget: questionBudget, sessionId: session.id }),
+            stamp,
+          ],
+        );
+        this.db.run(
+          "UPDATE comparison_sessions SET status='completed',ended_at=?,after_snapshot_id=?,updated_at=? WHERE id=?",
+          [stamp, this.snapshot(session.value_set_id, "rapid-ranking-complete", null), stamp, session.id],
+        );
+      });
+      return;
+    }
+    const question = group;
     await this.db.transaction(() => {
+      this.db.run("DELETE FROM application_settings WHERE key=?", [
+        `rapid-prepared:${session.id}`,
+      ]);
       this.db.run("DELETE FROM comparison_queue WHERE session_id=?", [session.id]);
       this.db.run(
         "INSERT INTO comparison_queue VALUES (?,?,?,?,?,?,?,?)",
-        [uid(), session.id, group.valueIds[0], group.valueIds[1], `Rapid ranking · ${group.question}/${group.budget}`, 0, 0, stamp],
+        [
+          uid(),
+          session.id,
+          group.valueIds[0],
+          group.valueIds[1],
+          group.continuing
+            ? `Targeted convergence · question ${group.question}`
+            : `Rapid ranking · ${group.question}/${group.budget}`,
+          0,
+          0,
+          stamp,
+        ],
       );
       this.db.run(
         "INSERT INTO application_settings(key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at",
         [`rapid-question:${session.id}`, json(question), stamp],
       );
+    });
+  }
+
+  sessionConvergence(sessionId: string): ConvergenceDiagnostics {
+    const session = this.db.one<SessionRow>(
+      "SELECT * FROM comparison_sessions WHERE id=?",
+      [sessionId],
+    );
+    if (!session) throw new Error("Session not found");
+    const settings = this.settings();
+    const scope = this.exactScope(sessionId);
+    const scopedRatings = this.ratings(session.value_set_id, scope);
+    const ratings = scopedRatings.length ? scopedRatings : this.ratings(session.value_set_id);
+    const snapshots = this.db.query<{ id: string }>(
+      "SELECT id FROM rating_snapshots WHERE value_set_id=? AND scope_key='global' ORDER BY created_at DESC LIMIT ?",
+      [session.value_set_id, settings.convergence.stabilityWindow],
+    );
+    return convergenceDiagnostics({
+      values: ratings.map((rating) => ({
+        id: rating.value_id,
+        name: rating.name,
+        parentCategory: rating.parent_category,
+        aliases: [],
+        rating,
+      })),
+      recentRankings: snapshots.map((snapshot) =>
+        this.db
+          .query<{ value_id: string }>(
+            "SELECT value_id FROM rating_snapshot_entries WHERE snapshot_id=? ORDER BY rank",
+            [snapshot.id],
+          )
+          .map((entry) => entry.value_id),
+      ),
+      config: settings.convergence,
+      suspectedContradictions: this.db.query(
+        "SELECT id FROM tensions WHERE status='suggested'",
+      ).length,
     });
   }
 
@@ -1074,14 +1243,22 @@ export class BrowserRepository {
       choices.some((choice) => !question.valueIds.includes(choice.focalValueId))
     )
       throw new Error("The generated portraits do not match this question");
-    const orderedChoices = [
-      most,
-      ...choices.filter((choice) => choice.id !== most.id && choice.id !== least.id),
-      least,
+    const decisions = [
+      ...choices
+        .filter((choice) => choice.id !== most.id)
+        .map((choice) => ({
+          leftValueId: most.focalValueId,
+          rightValueId: choice.focalValueId,
+          result: "left" as const,
+        })),
+      ...choices
+        .filter((choice) => choice.id !== least.id && choice.id !== most.id)
+        .map((choice) => ({
+          leftValueId: choice.focalValueId,
+          rightValueId: least.focalValueId,
+          result: "left" as const,
+        })),
     ];
-    const decisions = adjacentDecisions(
-      orderedChoices.map((choice) => choice.focalValueId),
-    );
     const eventIds = decisions.map(() => uid());
     const stamp = now();
     await this.db.transaction(() => {
@@ -1318,9 +1495,10 @@ export class BrowserRepository {
           `rapid-ranking:${targetSetId}:%`,
         ]);
         for (const sessionId of sessionIds) {
-          this.db.run("DELETE FROM application_settings WHERE key IN (?,?,?)", [
+          this.db.run("DELETE FROM application_settings WHERE key IN (?,?,?,?)", [
             `session-mode:${sessionId}`,
             `rapid-question:${sessionId}`,
+            `rapid-prepared:${sessionId}`,
             `exact-ranking-session:${sessionId}`,
           ]);
         }
