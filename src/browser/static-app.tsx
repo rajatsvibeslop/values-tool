@@ -993,8 +993,30 @@ function Compare({ repo, db, mutate }: ViewProps) {
   const [sessionId, setSessionId] = useState(activeSession?.id ?? "");
   const [creating, setCreating] = useState(!activeSession);
   const [newSetId, setNewSetId] = useState(
-    localStorage.getItem("values-set") ?? sets[0]?.id ?? "",
+    localStorage.getItem("values-set") ??
+      sets[0]?.id ??
+      `preset:${presetCatalog[0]!.slug}`,
   );
+  const importedPresetSlugs = new Set(
+    sets.flatMap((set) => {
+      try {
+        const metadata = JSON.parse(set.source_metadata) as { preset?: string };
+        return metadata.preset ? [metadata.preset] : [];
+      } catch {
+        return [];
+      }
+    }),
+  );
+  const availablePresets = presetCatalog.filter(
+    (preset) => !importedPresetSlugs.has(preset.slug),
+  );
+  const setChoice =
+    sets.some((set) => set.id === newSetId) || newSetId.startsWith("preset:")
+      ? newSetId
+      : (sets[0]?.id ?? `preset:${presetCatalog[0]!.slug}`);
+  const setChoiceName = setChoice.startsWith("preset:")
+    ? presetCatalog.find((preset) => `preset:${preset.slug}` === setChoice)?.name
+    : sets.find((set) => set.id === setChoice)?.name;
   const session = creating
     ? undefined
     : sessions.find((item) => item.id === sessionId);
@@ -1042,19 +1064,21 @@ function Compare({ repo, db, mutate }: ViewProps) {
       >
         <div className="grid two-col">
           <Panel title="New session">
-            {sets.length ? (
-              <form
+            <form
                 className="stack"
                 onSubmit={(event) => {
                   const data = submit(event);
                   mutate(async () => {
-                    const selectedSetId = newSetId || sets[0]!.id;
+                    const selectedSetId = setChoice.startsWith("preset:")
+                      ? await repo.importPreset(setChoice.slice("preset:".length))
+                      : setChoice;
                     const id = await repo.startSession(
                       selectedSetId,
                       String(data.get("name")),
                       data.getAll("contexts").map(String),
                     );
                     localStorage.setItem("values-set", selectedSetId);
+                    setNewSetId(selectedSetId);
                     setSessionId(id);
                     setCreating(false);
                   });
@@ -1067,23 +1091,33 @@ function Compare({ repo, db, mutate }: ViewProps) {
                   <select
                     className="select"
                     name="set"
-                    value={newSetId || sets[0]?.id}
+                    value={setChoice}
                     onChange={(event) => setNewSetId(event.target.value)}
                   >
-                    {sets.map((set) => (
-                      <option value={set.id} key={set.id}>
-                        {set.name} ({set.value_count} values)
-                      </option>
-                    ))}
+                    {sets.length > 0 && (
+                      <optgroup label="Your value sets">
+                        {sets.map((set) => (
+                          <option value={set.id} key={set.id}>
+                            {set.name} ({set.value_count} values)
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {availablePresets.length > 0 && (
+                      <optgroup label="Start from a preset">
+                        {availablePresets.map((preset) => (
+                          <option value={`preset:${preset.slug}`} key={preset.slug}>
+                            {preset.name} ({preset.values.length} values)
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
                   </select>
                 </Field>
                 <div className="notice small">
                   This session will compare{" "}
                   <strong>
-                    {
-                      sets.find((set) => set.id === (newSetId || sets[0]?.id))
-                        ?.name
-                    }
+                    {setChoiceName}
                   </strong>
                   .
                 </div>
@@ -1105,13 +1139,6 @@ function Compare({ repo, db, mutate }: ViewProps) {
                   Start session
                 </button>
               </form>
-            ) : (
-              <Empty title="No value sets available">
-                <a className="btn" href="#values">
-                  Create or import a value set
-                </a>
-              </Empty>
-            )}
           </Panel>
           <Panel title="Previous sessions">
             <div className="stack">

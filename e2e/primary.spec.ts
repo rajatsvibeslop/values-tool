@@ -54,6 +54,20 @@ test("lets a new session choose among multiple value sets", async ({ page }) => 
   await expect(page.getByRole("heading", { name: "Chosen set session" })).toBeVisible();
 });
 
+test("starts a new session directly from a preset", async ({ page }) => {
+  await page.locator(".preset-row").filter({ hasText: "Editable values card sort" }).getByRole("button", { name: "Use set" }).click();
+  await page.locator('a[href="#compare"]').first().click();
+  await page.getByLabel("Session name").fill("First session");
+  await page.getByRole("button", { name: "Start session" }).click();
+  await page.getByRole("button", { name: "New session" }).click();
+  await page.getByLabel("Value set").selectOption("preset:schwartz-10");
+  await expect(page.getByText("This session will compare Schwartz 10 broad basic values.")).toBeVisible();
+  await page.getByLabel("Session name").fill("Preset session");
+  await page.getByRole("button", { name: "Start session" }).click();
+  await expect(page.getByRole("heading", { name: "Preset session" })).toBeVisible();
+  await expect(page.getByText("1/10 placed", { exact: true })).toBeVisible();
+});
+
 test("shares a read-only ranking snapshot by URL", async ({ page, browser }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "One browser project is sufficient for link portability");
   await page.locator(".preset-row").filter({ hasText: "Schwartz 10 broad basic values" }).getByRole("button", { name: "Use set" }).click();
