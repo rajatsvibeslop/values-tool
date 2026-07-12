@@ -1153,8 +1153,12 @@ function Compare({ repo, db, mutate }: ViewProps) {
                     value={sessionMode}
                     onChange={(event) => setSessionMode(event.target.value as "rapid" | "exact")}
                   >
-                    <option value="rapid">Rapid · rank 5 values per question</option>
-                    <option value="exact">Exact · compare 2 values at a time</option>
+                    <option value="rapid">
+                      {scenarioConfig().provider === "local"
+                        ? "Rapid ordering · arrange 5 values"
+                        : "Scenario decisions · choose an action"}
+                    </option>
+                    <option value="exact">Direct ranking · compare 2 values</option>
                   </select>
                 </Field>
                 <div className="notice small">
@@ -1556,7 +1560,7 @@ function RapidCompare({
   const [scenarioError, setScenarioError] = useState("");
   const [generating, setGenerating] = useState(false);
   const [notes, setNotes] = useState(false);
-  const [directRanking, setDirectRanking] = useState(false);
+  const [mostChoiceId, setMostChoiceId] = useState("");
   const [choosing, setChoosing] = useState(false);
   const attempted = useRef("");
   const sessionContextIds = db
@@ -1576,6 +1580,7 @@ function RapidCompare({
       if (!automatic) setScenarioError("Add a scenario API key in Settings.");
       return;
     }
+    setMostChoiceId("");
     setGenerating(true);
     setScenarioError("");
     try {
@@ -1598,7 +1603,7 @@ function RapidCompare({
       setScenario(generated);
       await mutate(() => repo.updateRapidScenario(session.id, generated));
     } catch (cause) {
-      sessionStorage.removeItem(`scenario-request:${question.id}`);
+      sessionStorage.removeItem(`scenario-portraits:v4:${question.id}`);
       const message = cause instanceof Error ? cause.message : String(cause);
       setScenarioError(`${message}. Using the on-device scenario.`);
     } finally {
@@ -1608,11 +1613,11 @@ function RapidCompare({
 
   useEffect(() => {
     const config = scenarioConfig();
-    const requestKey = `scenario-request:${question.id}`;
+    const requestKey = `scenario-portraits:v4:${question.id}`;
     if (
-      scenario.provider === "local" &&
       config.provider !== "local" &&
       config.apiKey &&
+      (scenario.choices?.filter((choice) => choice.focalValueId).length ?? 0) < 2 &&
       attempted.current !== question.id &&
       !sessionStorage.getItem(requestKey)
     ) {
@@ -1644,20 +1649,25 @@ function RapidCompare({
     });
   const scenarioChoices = (scenario.choices ?? []).filter(
     (choice) =>
-      choice.valueOrder.length === question.valueIds.length &&
-      [...choice.valueOrder].sort().join(":") === [...question.valueIds].sort().join(":"),
+      question.valueIds.includes(choice.focalValueId),
   );
-  const useScenarioChoices = scenarioChoices.length >= 2 && !directRanking;
+  const hostedScenarioMode = scenarioConfig().provider !== "local";
+  const useScenarioChoices = scenarioChoices.length >= 2;
   const chooseScenario = async (choice: ScenarioChoice) => {
     if (choosing) return;
+    if (!mostChoiceId) {
+      setMostChoiceId(choice.id);
+      return;
+    }
+    if (choice.id === mostChoiceId) return;
     setChoosing(true);
     await mutate(() =>
-      repo.submitRapidRanking({
+      repo.submitScenarioPortrait({
         sessionId: session.id,
         setId: session.value_set_id,
-        orderedValueIds: choice.valueOrder,
         contexts: sessionContextIds,
-        scenarioChoiceId: choice.id,
+        mostChoiceId,
+        leastChoiceId: choice.id,
       }),
     );
     setChoosing(false);
@@ -1691,25 +1701,31 @@ function RapidCompare({
       <div className="ordering-strip rapid-strip">
         <div>
           <span className="ordering-label">QUESTION {question.question} OF {question.budget}</span>
-          <strong>{useScenarioChoices ? "What would you do?" : "Order what matters."}</strong>
+          <strong>
+            {hostedScenarioMode
+              ? mostChoiceId
+                ? "Who is least like you?"
+                : "Who is most like you?"
+              : "Order what matters."}
+          </strong>
         </div>
         <div className="ordering-progress">
           <span style={{ width: `${((question.question - 1) / question.budget) * 100}%` }} />
         </div>
-        <span className="mono muted">{useScenarioChoices ? "one decision" : "5 at a time"}</span>
+        <span className="mono muted">{hostedScenarioMode ? "most + least" : "5 at a time"}</span>
       </div>
       <section className="scenario-band" aria-live="polite">
         <Sparkles size={18} />
         <div>
           <span className="scenario-label">
-            {generating ? "GENERATING SCENARIO" : `${scenario.provider.toUpperCase()} SCENARIO`}
+            {generating ? "GENERATING SCENARIO" : "DECISION SCENARIO"}
           </span>
           <p>{generating ? "Creating a neutral decision context…" : scenario.text}</p>
           {scenarioError && <div className="small badge-danger">{scenarioError}</div>}
         </div>
-        {scenarioConfig().provider !== "local" && (
+        {scenarioConfig().provider !== "local" && useScenarioChoices && (
           <button className="btn btn-sm" disabled={generating} onClick={() => void generateScenario(false)}>
-            <RefreshCw size={13} /> Regenerate
+            <RefreshCw size={13} /> New scenario
           </button>
         )}
       </section>
@@ -1720,22 +1736,35 @@ function RapidCompare({
           <div className="scenario-choice-list">
             {scenarioChoices.map((choice, index) => (
               <button
-                className="scenario-choice"
-                disabled={choosing}
+                className={`scenario-choice ${choice.id === mostChoiceId ? "scenario-choice-selected" : ""}`}
+                disabled={choosing || choice.id === mostChoiceId}
                 key={`${choice.id}:${index}`}
                 onClick={() => void chooseScenario(choice)}
                 type="button"
               >
-                <span className="scenario-choice-key">{index + 1}</span>
-                <span>{choice.text}</span>
-                <ChevronRight size={17} aria-hidden="true" />
+                <span className="scenario-choice-key">{choice.id}</span>
+                <span className="scenario-choice-copy">
+                  <strong>Person {choice.id}</strong>
+                  <span>{choice.text}</span>
+                </span>
+                {choice.id === mostChoiceId
+                  ? <Check size={17} aria-label="Most like you" />
+                  : <ChevronRight size={17} aria-hidden="true" />}
               </button>
             ))}
           </div>
-          <button className="btn btn-sm" type="button" onClick={() => setDirectRanking(true)}>
-            Compare values instead
-          </button>
+          {mostChoiceId && (
+            <button className="btn btn-sm" type="button" onClick={() => setMostChoiceId("")}>
+              Change most-like choice
+            </button>
+          )}
         </section>
+      ) : hostedScenarioMode ? (
+        <div className="scenario-loading">
+          <button className="btn btn-primary" type="button" onClick={() => void generateScenario(false)}>
+            <RefreshCw size={14} /> Generate actions
+          </button>
+        </div>
       ) : <form
         onSubmit={(event) => {
           const data = submit(event);
@@ -1781,11 +1810,6 @@ function RapidCompare({
           })}
         </div>
         <div className="rapid-submit">
-          {scenarioChoices.length >= 2 && (
-            <button type="button" className="btn" onClick={() => setDirectRanking(false)}>
-              Back to actions
-            </button>
-          )}
           <button type="button" className="btn" onClick={() => setNotes((value) => !value)}>
             Add note
           </button>

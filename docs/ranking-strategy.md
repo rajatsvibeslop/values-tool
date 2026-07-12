@@ -9,10 +9,11 @@ orders, so any method needs at least `ceil(log2(n!))` answers in the worst case.
 values that lower bound is 525.
 
 The default product target is instead a high-quality inferred order in fewer than 100
-questions. Rapid sessions ask the user to fully order five values. Since one such answer
-has up to `log2(5!)` = 6.9 bits, the information floor for 100 distinct values is 76
-five-value questions. The application uses a fixed budget of 80 and retains uncertainty
-rather than claiming a worst-case exact guarantee.
+questions. Direct rapid sessions can ask the user to fully order five values. Hosted
+scenario sessions use a less abstract portrait task: identify the person most and least
+like the user among three controlled actions. The application uses a fixed budget of 80
+and retains uncertainty rather than claiming a worst-case exact guarantee. Portrait mode
+deliberately trades some information per question for lower cognitive load.
 
 The application therefore uses a deterministic binary-insertion scheduler for exact
 ordering sessions. Its worst case for 100 values is 573 decisive comparisons. It is
@@ -32,6 +33,11 @@ Sources:
   https://proceedings.mlr.press/v84/heckel18a.html
 - Saha and Gopalan, *Active Ranking with Subset-wise Preferences* (AISTATS 2019):
   https://proceedings.mlr.press/v89/saha19a.html
+- Schwartz et al., *Extending the Cross-Cultural Validity of the Theory of Basic Human
+  Values with a Different Method of Measurement* (2001):
+  https://doi.org/10.1177/0022022101032005001
+- Marley and Louviere, *Some probabilistic models of best, worst, and best-worst
+  choices* (2005): https://doi.org/10.1016/j.jmp.2005.05.003
 
 ## Division of responsibility
 
@@ -40,6 +46,9 @@ Sources:
 - **Rapid scheduler:** selects five-value subsets for sparse coverage, uncertainty,
   boundary resolution, novel relations, and category diversity. A full answer is encoded
   as four adjacent relations, not ten falsely independent pairwise observations.
+- **Portrait instrument:** assigns three distinct focal values before generation. The LLM
+  verbalizes matched anonymous actions but cannot alter their hidden scoring keys. A
+  most/least response creates two adjacent relations and retains the complete stimulus.
 - **TrueSkill:** estimates latent strength and posterior uncertainty, including sparse
   contextual rankings.
 - **Verification:** targets adjacent boundaries with weak posterior separation,

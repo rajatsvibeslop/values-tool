@@ -994,7 +994,6 @@ export class BrowserRepository {
     orderedValueIds: string[];
     contexts: string[];
     reasoning?: string;
-    scenarioChoiceId?: string;
   }): Promise<void> {
     const question = this.rapidQuestion(input.sessionId);
     if (!question) throw new Error("Rapid question not found");
@@ -1003,14 +1002,6 @@ export class BrowserRepository {
       [...input.orderedValueIds].sort().join(":") !== [...question.valueIds].sort().join(":")
     )
       throw new Error("The submitted order does not match the active question");
-    const scenarioChoice = input.scenarioChoiceId
-      ? question.scenario.choices?.find((choice) => choice.id === input.scenarioChoiceId)
-      : undefined;
-    if (
-      input.scenarioChoiceId &&
-      (!scenarioChoice || scenarioChoice.valueOrder.join(":") !== input.orderedValueIds.join(":"))
-    )
-      throw new Error("The selected scenario action does not match the active question");
     const decisions = adjacentDecisions(input.orderedValueIds);
     const eventIds = decisions.map(() => uid());
     const stamp = now();
@@ -1023,7 +1014,7 @@ export class BrowserRepository {
           [
             eventId, input.sessionId, input.setId, decision.leftValueId,
             decision.rightValueId, "left", "moderate", "confident", "intrinsic",
-            json(scenarioChoice ? ["multiway", "scenario-choice"] : ["multiway"]),
+            json(["multiway"]),
             json(eventIds.filter((id) => id !== eventId)),
             null, "", 0, `rapid-ranking:${question.id}:${index + 1}/${decisions.length}`,
             1, stamp + index, stamp + index,
@@ -1042,12 +1033,6 @@ export class BrowserRepository {
             this.db.run("INSERT INTO comparison_notes VALUES (?,?,?,?,?)", [
               uid(), eventId, "reasoning", input.reasoning, stamp,
             ]);
-          if (scenarioChoice)
-            this.db.run("INSERT INTO comparison_notes VALUES (?,?,?,?,?)", [
-              uid(), eventId, "scenario_choice",
-              `Selected action ${scenarioChoice.id}: ${scenarioChoice.text}`,
-              stamp,
-            ]);
         }
       });
       this.db.run(
@@ -1061,6 +1046,89 @@ export class BrowserRepository {
     });
     await this.recompute(input.setId);
     await this.db.transaction(() => this.snapshot(input.setId, "after-rapid-question", eventIds.at(-1)!));
+    await this.refreshTensions(input.setId);
+    await this.regenerateQueue(input.sessionId);
+  }
+
+  async submitScenarioPortrait(input: {
+    sessionId: string;
+    setId: string;
+    contexts: string[];
+    mostChoiceId: string;
+    leastChoiceId: string;
+  }): Promise<void> {
+    const question = this.rapidQuestion(input.sessionId);
+    if (!question) throw new Error("Scenario question not found");
+    const choices = question.scenario.choices ?? [];
+    const most = choices.find((choice) => choice.id === input.mostChoiceId);
+    const least = choices.find((choice) => choice.id === input.leastChoiceId);
+    if (!most || !least || most.id === least.id)
+      throw new Error("Choose different most-like and least-like people");
+    if (
+      choices.length < 2 ||
+      new Set(choices.map((choice) => choice.focalValueId)).size !== choices.length ||
+      choices.some((choice) => !question.valueIds.includes(choice.focalValueId))
+    )
+      throw new Error("The generated portraits do not match this question");
+    const orderedChoices = [
+      most,
+      ...choices.filter((choice) => choice.id !== most.id && choice.id !== least.id),
+      least,
+    ];
+    const decisions = adjacentDecisions(
+      orderedChoices.map((choice) => choice.focalValueId),
+    );
+    const eventIds = decisions.map(() => uid());
+    const stamp = now();
+    await this.db.transaction(() => {
+      this.snapshot(input.setId, "before-portrait-question", null);
+      decisions.forEach((decision, index) => {
+        const eventId = eventIds[index]!;
+        this.db.run(
+          "INSERT INTO comparison_events VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+          [
+            eventId, input.sessionId, input.setId, decision.leftValueId,
+            decision.rightValueId, "left", "moderate", "somewhat", "intrinsic",
+            json(["portrait-choice", "best-worst"]),
+            json(eventIds.filter((id) => id !== eventId)),
+            null, "", 0, `portrait-best-worst:${question.id}:${index + 1}/${decisions.length}`,
+            1, stamp + index, stamp + index,
+          ],
+        );
+        input.contexts.forEach((contextId) =>
+          this.db.run("INSERT INTO comparison_event_contexts VALUES (?,?)", [eventId, contextId]),
+        );
+        if (index === 0) {
+          this.db.run("INSERT INTO comparison_notes VALUES (?,?,?,?,?)", [
+            uid(), eventId, "general",
+            `Portrait scenario [${question.scenario.provider}/${question.scenario.model}]: ${question.scenario.text}\n${choices.map((choice) => `Person ${choice.id}: ${choice.text}`).join("\n")}`,
+            stamp,
+          ]);
+          this.db.run("INSERT INTO comparison_notes VALUES (?,?,?,?,?)", [
+            uid(), eventId, "portrait_most",
+            `Most like me -- Person ${most.id}: ${most.text}`,
+            stamp,
+          ]);
+          this.db.run("INSERT INTO comparison_notes VALUES (?,?,?,?,?)", [
+            uid(), eventId, "portrait_least",
+            `Least like me -- Person ${least.id}: ${least.text}`,
+            stamp,
+          ]);
+        }
+      });
+      this.db.run(
+        "UPDATE comparison_sessions SET completed_count=completed_count+1,updated_at=? WHERE id=?",
+        [stamp, input.sessionId],
+      );
+      this.db.run("DELETE FROM comparison_queue WHERE session_id=?", [input.sessionId]);
+      this.db.run("DELETE FROM application_settings WHERE key=?", [
+        `rapid-question:${input.sessionId}`,
+      ]);
+    });
+    await this.recompute(input.setId);
+    await this.db.transaction(() =>
+      this.snapshot(input.setId, "after-portrait-question", eventIds.at(-1)!),
+    );
     await this.refreshTensions(input.setId);
     await this.regenerateQueue(input.sessionId);
   }

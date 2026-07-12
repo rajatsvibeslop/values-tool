@@ -137,19 +137,24 @@ test("stores hosted scenario credentials only for the browser tab", async ({ pag
   await page.route("https://openrouter.ai/api/v1/chat/completions", (route) => {
     const body = route.request().postDataJSON() as {
       max_tokens: number;
-      reasoning: { effort: string; exclude: boolean };
+      response_format: { type: string; json_schema: { strict: boolean } };
+      plugins: { id: string }[];
+      provider: { require_parameters: boolean };
     };
     expect(body.max_tokens).toBe(1_400);
-    expect(body.reasoning).toEqual({ effort: "low", exclude: true });
+    expect(body.response_format.type).toBe("json_schema");
+    expect(body.response_format.json_schema.strict).toBe(true);
+    expect(body.plugins).toEqual([{ id: "response-healing" }]);
+    expect(body.provider.require_parameters).toBe(true);
     return route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ choices: [{ message: { content: JSON.stringify({
         scenario: "You must choose between a secure familiar role and a risky opportunity to build something meaningful with people you trust.",
         choices: [
-          { id: "A", action: "Accept the secure role and protect time for a smaller independent project.", value_order: [0, 1, 2, 3, 4] },
-          { id: "B", action: "Join the risky project and create a concrete fallback plan with your collaborators.", value_order: [1, 2, 3, 4, 0] },
-          { id: "C", action: "Negotiate a short trial that delays the permanent choice until you have direct evidence.", value_order: [2, 3, 4, 0, 1] },
+          { id: "A", action: "Accept the secure role and protect time for a smaller independent project." },
+          { id: "B", action: "Join the risky project and create a concrete fallback plan with your collaborators." },
+          { id: "C", action: "Negotiate a short trial that delays the permanent choice until you have direct evidence." },
         ],
       }) } }] }),
     });
@@ -161,6 +166,8 @@ test("stores hosted scenario credentials only for the browser tab", async ({ pag
   await expect(page.getByText(/secure familiar role/)).toBeVisible();
   await expect(page.locator(".scenario-choice")).toHaveCount(3);
   await page.getByRole("button", { name: /Accept the secure role/ }).click();
+  await expect(page.getByText("Who is least like you?")).toBeVisible();
+  await page.getByRole("button", { name: /Negotiate a short trial/ }).click();
   await expect(page.getByText("2/8", { exact: true })).toBeVisible();
 });
 

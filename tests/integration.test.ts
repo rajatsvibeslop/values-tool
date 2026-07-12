@@ -63,27 +63,47 @@ describe("browser repository integration", () => {
     const question = repo.rapidQuestion(sessionId)!;
     expect(question.valueIds).toHaveLength(5);
     expect(question.budget).toBe(16);
-    const choiceOrder = [...question.valueIds].reverse();
-    await repo.updateRapidScenario(sessionId, {
-      text: "A concrete choice with several reasonable actions.",
-      provider: "openrouter",
-      model: "test-model",
-      generatedAt: new Date().toISOString(),
-      choices: [{ id: "A", text: "Take the reversible path and learn from direct experience.", valueOrder: choiceOrder }],
-    });
     await repo.submitRapidRanking({
       sessionId,
       setId,
-      orderedValueIds: choiceOrder,
+      orderedValueIds: [...question.valueIds].reverse(),
       contexts: [],
-      scenarioChoiceId: "A",
     });
     expect(repo.sessions().find((session) => session.id === sessionId)?.completed_count).toBe(1);
     expect(repo.history(setId)).toHaveLength(4);
-    expect(repo.history(setId)[0]?.tags).toContain("scenario-choice");
-    expect(database.query<{ text: string }>("SELECT text FROM comparison_notes WHERE note_type='scenario_choice'")[0]?.text).toContain("Selected action A");
     expect(repo.rapidQuestion(sessionId)?.question).toBe(2);
     expect(repo.queue(sessionId)).toHaveLength(1);
+  });
+
+  it("records a portrait best-worst response as two conservative relations", async () => {
+    const setId = await repo.importPreset("editable-card-sort");
+    const sessionId = await repo.startSession(setId, "Portrait choices", [], "rapid");
+    const question = repo.rapidQuestion(sessionId)!;
+    const focalValues = question.valueIds.slice(0, 3);
+    await repo.updateRapidScenario(sessionId, {
+      text: "Three colleagues choose different reasonable paths through the same decision.",
+      provider: "openrouter",
+      model: "test-model",
+      generatedAt: new Date().toISOString(),
+      choices: focalValues.map((focalValueId, index) => ({
+        id: String.fromCharCode(65 + index),
+        text: `Person ${index + 1} takes a distinct but plausible course of action.`,
+        focalValueId,
+      })),
+    });
+    await repo.submitScenarioPortrait({
+      sessionId,
+      setId,
+      contexts: [],
+      mostChoiceId: "A",
+      leastChoiceId: "C",
+    });
+    expect(repo.sessions().find((session) => session.id === sessionId)?.completed_count).toBe(1);
+    expect(repo.history(setId)).toHaveLength(2);
+    expect(repo.history(setId)[0]?.tags).toContain("portrait-choice");
+    expect(database.query<{ text: string }>("SELECT text FROM comparison_notes WHERE note_type='portrait_most'")[0]?.text).toContain("Person A");
+    expect(database.query<{ text: string }>("SELECT text FROM comparison_notes WHERE note_type='portrait_least'")[0]?.text).toContain("Person C");
+    expect(repo.rapidQuestion(sessionId)?.question).toBe(2);
   });
 
   it("resets one value set's evidence without deleting its values", async () => {

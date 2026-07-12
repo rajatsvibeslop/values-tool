@@ -65,6 +65,10 @@
     context, and question purpose. Definition-derived generation is always available;
     optional OpenAI-compatible providers use session-only credentials that are excluded
     from exports and durable storage.
+11. **Portrait scoring:** The scheduler assigns three focal values before asking an LLM
+    to verbalize anonymous actions. The user selects the most- and least-self-similar
+    portraits, yielding two conservative relations. The LLM cannot create or revise the
+    hidden scoring key, and the complete stimulus and response remain in the event log.
 
 ## Verification Gates
 

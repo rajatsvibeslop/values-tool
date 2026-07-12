@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  buildScenarioProfiles,
   deriveScenario,
   extractScenarioChoices,
   extractScenarioText,
@@ -11,8 +12,8 @@ const request = {
   purpose: "Choose a career direction",
   question: 1,
   values: [
-    { name: "Security", definition: "Maintain dependable foundations.", category: "Stability" },
-    { name: "Adventure", definition: "Seek novel and stretching experience.", category: "Exploration" },
+    { id: "security", name: "Security", definition: "Maintain dependable foundations.", category: "Stability" },
+    { id: "adventure", name: "Adventure", definition: "Seek novel and stretching experience.", category: "Exploration" },
   ],
 };
 
@@ -36,22 +37,20 @@ describe("definition-derived scenarios", () => {
     ).toBe("A concrete decision with competing obligations.");
   });
 
-  it("maps generated actions back to a validated hidden value order", () => {
+  it("maps generated portraits to focal values assigned before generation", () => {
+    const profiles = buildScenarioProfiles(request.values, "fixed-seed");
     const content = JSON.stringify({
       scenario: "A difficult choice.",
       choices: [
-        { id: "A", action: "Take the reliable role and build creative work around it.", value_order: [0, 1] },
-        { id: "B", action: "Take the uncertain role and preserve a practical fallback.", value_order: [1, 0] },
-        { id: "C", action: "Negotiate a trial period before making a permanent commitment.", value_order: [1, 0] },
+        { id: "A", action: "Take the reliable role and build creative work around it." },
+        { id: "B", action: "Take the uncertain role and preserve a practical fallback." },
       ],
     });
-    const choices = extractScenarioChoices(content, request.values.map((value, index) => ({
-      ...value,
-      id: `value-${index}`,
-    })));
-    expect(choices).toHaveLength(3);
-    expect(choices[0]?.valueOrder).toEqual(["value-0", "value-1"]);
-    expect(choices[1]?.valueOrder).toEqual(["value-1", "value-0"]);
+    const choices = extractScenarioChoices(content, profiles);
+    expect(choices).toHaveLength(2);
+    expect(choices.map((choice) => choice.focalValueId)).toEqual(
+      profiles.map((profile) => profile.focalValueId),
+    );
   });
 
   it("disables DeepSeek thinking so the output budget reaches final content", async () => {
@@ -59,7 +58,13 @@ describe("definition-derived scenarios", () => {
       new Response(
         JSON.stringify({
           model: "deepseek-v4-flash",
-          choices: [{ finish_reason: "stop", message: { content: '{"scenario":"A promotion offers security but leaves little time for meaningful creative work."}' } }],
+          choices: [{ finish_reason: "stop", message: { content: JSON.stringify({
+            scenario: "A promotion offers security but leaves little time for meaningful creative work.",
+            choices: [
+              { id: "A", action: "Accept the dependable role and protect a weekly block for experimentation." },
+              { id: "B", action: "Pursue the uncertain opportunity with a clear financial fallback." },
+            ],
+          }) } }],
         }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       ),
@@ -76,6 +81,8 @@ describe("definition-derived scenarios", () => {
     expect(body.thinking).toEqual({ type: "disabled" });
     expect(body.max_tokens).toBe(400);
     expect(result.text).toContain("promotion offers security");
+    expect(result.choices).toHaveLength(2);
+    expect(new Set(result.choices?.map((choice) => choice.focalValueId)).size).toBe(2);
   });
 
   it("surfaces provider errors even when the HTTP response is successful", async () => {

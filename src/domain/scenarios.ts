@@ -10,6 +10,7 @@ export interface ScenarioRequest {
   contexts: string[];
   purpose: string;
   question: number;
+  profiles?: ScenarioProfile[];
 }
 
 export interface GeneratedScenario {
@@ -23,7 +24,12 @@ export interface GeneratedScenario {
 export interface ScenarioChoice {
   id: string;
   text: string;
-  valueOrder: string[];
+  focalValueId: string;
+}
+
+export interface ScenarioProfile {
+  id: string;
+  focalValueId: string;
 }
 
 export interface ScenarioProvider {
@@ -41,6 +47,31 @@ export interface HostedScenarioConfig {
 
 const clean = (value: string) => value.trim().replace(/\s+/g, " ");
 
+function hash(input: string): number {
+  let value = 2166136261;
+  for (let index = 0; index < input.length; index++) {
+    value ^= input.charCodeAt(index);
+    value = Math.imul(value, 16777619);
+  }
+  return value >>> 0;
+}
+
+export function buildScenarioProfiles(
+  values: ScenarioValue[],
+  seed: string,
+): ScenarioProfile[] {
+  return [...values]
+    .sort(
+      (left, right) =>
+        hash(`${seed}:${left.id ?? left.name}`) - hash(`${seed}:${right.id ?? right.name}`),
+    )
+    .slice(0, Math.min(3, values.length))
+    .map((value, index) => ({
+      id: String.fromCharCode(65 + index),
+      focalValueId: value.id ?? value.name,
+    }));
+}
+
 export function deriveScenario(input: ScenarioRequest): GeneratedScenario {
   const context = input.contexts.length ? input.contexts.join(" and ") : "an important life decision";
   const stakes = input.values
@@ -57,11 +88,10 @@ export function deriveScenario(input: ScenarioRequest): GeneratedScenario {
   };
 }
 
-function scenarioPrompt(input: ScenarioRequest) {
-  const actionCount = Math.min(3, input.values.length);
+function scenarioPrompt(input: ScenarioRequest & { profiles: ScenarioProfile[] }) {
+  const actionCount = input.profiles.length;
   const finalLabel = String.fromCharCode(64 + actionCount);
-  const exampleOrder = input.values.map((_, index) => index).join(",");
-  return `Create one concrete, realistic decision scenario and ${actionCount} possible actions for a personal-values ranking exercise.
+  return `Create one concrete, realistic decision scenario and ${actionCount} possible actions for a personal-values portrait exercise.
 
 Requirements:
 - Make all supplied values genuinely relevant and in tension.
@@ -70,17 +100,56 @@ Requirements:
 - Use the context and session purpose when supplied.
 - Write the scenario in 2 concise sentences, under 70 words total.
 - Write ${actionCount} distinct, concrete actions labeled A through ${finalLabel}, each under 24 words.
-- Keep every action plausible. Each action must prioritize a different supplied value first,
-  while also implying a complete priority order over all five values.
-- For each action, include that hidden order as value_order: a permutation of the integer
-  indices 0 through ${input.values.length - 1}. The action text must not reveal those indices or value names.
+- Each action belongs to an anonymous person and must primarily express its assigned focal value.
+- Match feasibility, competence, kindness, risk, and social desirability across the actions as closely as possible.
+- Vary the value tradeoff, not demographic details, writing style, or how admirable the person sounds.
+- The action text must not reveal value names, value indices, or a preferred answer.
 - Return only JSON in this shape:
-  {"scenario":"...","choices":[{"id":"A","action":"...","value_order":[${exampleOrder}]}]}.
+  {"scenario":"...","choices":[{"id":"A","action":"..."}]}.
 
 Context: ${input.contexts.join(", ") || "General life"}
 Purpose: ${input.purpose || "Clarify personal priorities"}
 Values:
-${input.values.map((value, index) => `${index}. ${value.name}: ${value.definition || "No definition supplied"} (${value.category || "uncategorized"})`).join("\n")}`;
+${input.values.map((value, index) => `${index}. ${value.name}: ${value.definition || "No definition supplied"} (${value.category || "uncategorized"})`).join("\n")}
+
+Hidden portrait assignments:
+${input.profiles.map((profile) => {
+  const value = input.values.find((item) => (item.id ?? item.name) === profile.focalValueId)!;
+  return `- Person ${profile.id}: primarily express ${value.name} -- ${value.definition}`;
+}).join("\n")}`;
+}
+
+function scenarioResponseFormat(input: ScenarioRequest & { profiles: ScenarioProfile[] }) {
+  const actionCount = input.profiles.length;
+  return {
+    type: "json_schema",
+    json_schema: {
+      name: "value_decision_scenario",
+      strict: true,
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          scenario: { type: "string", minLength: 20, maxLength: 600 },
+          choices: {
+            type: "array",
+            minItems: actionCount,
+            maxItems: actionCount,
+            items: {
+              type: "object",
+              additionalProperties: false,
+              properties: {
+                id: { type: "string", enum: Array.from({ length: actionCount }, (_, index) => String.fromCharCode(65 + index)) },
+                action: { type: "string", minLength: 12, maxLength: 240 },
+              },
+              required: ["id", "action"],
+            },
+          },
+        },
+        required: ["scenario", "choices"],
+      },
+    },
+  };
 }
 
 function contentText(content: unknown): string {
@@ -110,7 +179,7 @@ export function extractScenarioText(content: unknown): string {
 
 export function extractScenarioChoices(
   content: unknown,
-  values: ScenarioValue[],
+  profiles: ScenarioProfile[],
 ): ScenarioChoice[] {
   const raw = contentText(content)
     .trim()
@@ -131,25 +200,17 @@ export function extractScenarioChoices(
         id?: unknown;
         action?: unknown;
         text?: unknown;
-        value_order?: unknown;
-        valueOrder?: unknown;
-        priority_order?: unknown;
       };
+      const id = typeof item.id === "string" && item.id.trim()
+        ? item.id.trim()
+        : String.fromCharCode(65 + optionIndex);
       const text = contentText(item.action ?? item.text).trim();
-      const rawOrder = item.value_order ?? item.valueOrder ?? item.priority_order;
-      if (!text || !Array.isArray(rawOrder) || rawOrder.length !== values.length) return [];
-      const indices = rawOrder.map((index) =>
-        typeof index === "number" ? index : Number.parseInt(String(index), 10),
-      );
-      if (
-        indices.some((index) => !Number.isInteger(index) || index < 0 || index >= values.length) ||
-        new Set(indices).size !== values.length
-      )
-        return [];
+      const profile = profiles.find((item) => item.id === id);
+      if (!text || !profile) return [];
       return [{
-        id: typeof item.id === "string" && item.id.trim() ? item.id.trim() : String.fromCharCode(65 + optionIndex),
+        id,
         text: clean(text),
-        valueOrder: indices.map((index) => values[index]!.id ?? values[index]!.name),
+        focalValueId: profile.focalValueId,
       }];
     });
   } catch {
@@ -165,6 +226,13 @@ export class OpenAICompatibleScenarioProvider implements ScenarioProvider {
 
   async generate(input: ScenarioRequest): Promise<GeneratedScenario> {
     if (!this.config.apiKey.trim()) throw new Error("An API key is required for hosted scenarios");
+    const request = {
+      ...input,
+      profiles:
+        input.profiles?.length
+          ? input.profiles
+          : buildScenarioProfiles(input.values, `${input.purpose}:${input.question}`),
+    };
     const openRouter = this.config.provider === "openrouter";
     const endpoint = openRouter
       ? "https://openrouter.ai/api/v1/chat/completions"
@@ -188,15 +256,20 @@ export class OpenAICompatibleScenarioProvider implements ScenarioProvider {
         model,
         messages: [
           { role: "system", content: "You design neutral behavioral decision scenarios for reflective research." },
-          { role: "user", content: scenarioPrompt(input) },
+          { role: "user", content: scenarioPrompt(request) },
         ],
         temperature: 0.7,
         // The free router can select a mandatory-reasoning model. Its internal
         // tokens share this budget, so leave room for a short final answer.
         max_tokens: openRouter ? 1_400 : 400,
-        response_format: { type: "json_object" },
+        response_format: openRouter
+          ? scenarioResponseFormat(request)
+          : { type: "json_object" },
         ...(openRouter
-          ? { reasoning: { effort: "low", exclude: true } }
+          ? {
+              plugins: [{ id: "response-healing" }],
+              provider: { require_parameters: true },
+            }
           : { thinking: { type: "disabled" } }),
       }),
     });
@@ -220,12 +293,15 @@ export class OpenAICompatibleScenarioProvider implements ScenarioProvider {
       throw new Error(`The hosted model did not produce a final scenario${suffix}`);
     }
     if (scenario.length < 20) throw new Error("The generated scenario was too short");
+    const choices = extractScenarioChoices(content, request.profiles);
+    if (choices.length !== request.profiles.length)
+      throw new Error("The hosted model did not produce the required usable actions");
     return {
       text: clean(scenario),
       provider: this.config.provider,
       model: payload.model || model,
       generatedAt: new Date().toISOString(),
-      choices: extractScenarioChoices(content, input.values),
+      choices,
     };
   }
 }

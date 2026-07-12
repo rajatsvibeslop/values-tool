@@ -95,16 +95,16 @@ The ranking UI always labels the scope. Context-only results with sparse evidenc
 
 ## Rapid Five-Value Ranking
 
-Rapid ranking is the default session method. Each question presents five adaptively
-selected values and asks the user to arrange them from most to least important. A
-five-value order contains substantially more information than a binary choice:
+Rapid sessions adaptively select five values. With a hosted scenario provider, three
+of those values become hidden portrait assignments; without one, the user can directly
+arrange the five values. Direct ordering contains more information per question, while
+portrait choices reduce abstraction and cognitive load:
 
 - A 100-value session has a fixed budget of 80 questions.
 - Selection balances sparse coverage, posterior uncertainty, similar estimated strength,
   novel pair coverage, and category diversity.
-- One answer becomes four adjacent immutable events. These relations fully encode the
-  local order through transitivity without treating all ten correlated pairs as ten
-  independent observations.
+- A direct order becomes four adjacent immutable events. A portrait best-worst response
+  becomes two adjacent relations among three preassigned focal values.
 - A stable synthetic 100-value preference recovers a rank correlation above 0.9 within
   the budget in the automated domain test.
 - Completion means the rapid pass is finished, not that every adjacent relation is
@@ -116,10 +116,13 @@ reduce sample complexity relative to pairwise feedback. See Saha and Gopalan,
 
 ## Automatic Scenarios
 
-Every rapid question receives a scenario automatically. Hosted generators also create
-three short courses of action with hidden value-order mappings. Choosing the action the
-user would actually take records the implied order and the original action as provenance;
-direct five-value ordering remains available when the generated actions do not fit.
+Every rapid question receives a scenario automatically. Hosted generators create three
+short portraits of anonymous people taking different actions. The scheduler assigns each
+portrait a focal value before generation; the LLM only verbalizes those assignments and
+never decides how an answer should be scored. The user chooses the person most and least
+like them, producing a conservative order over the three focal values.
+Scenario sessions regenerate invalid actions instead of falling back to visible value
+sorting; direct ordering remains a separate method when no hosted provider is configured.
 Configure the generator in
 **Settings > Decision scenarios**:
 
@@ -131,10 +134,11 @@ Configure the generator in
 - **DeepSeek V4 Flash:** uses the OpenAI-compatible DeepSeek API and defaults to
   `deepseek-v4-flash`.
 
-Hosted prompts contain only the five displayed names, definitions, selected contexts,
-and session purpose. API keys are kept in `sessionStorage`, are removed when the tab is
-closed, and never enter SQLite, backups, exports, or share links. The generated scenario,
-provider, and model are preserved as evidence with the answer.
+Hosted prompts contain the five selected names and definitions, three preassigned focal
+profiles, selected contexts, and session purpose. API keys are kept in `sessionStorage`,
+are removed when the tab is closed, and never enter SQLite, backups, exports, or share
+links. The scenario, every portrait, most/least response, provider, and model are
+preserved as evidence with the answer.
 
 ## Exact Ordering and Adaptive Verification
 
