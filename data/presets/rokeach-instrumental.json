@@ -1,0 +1,28 @@
+{
+  "slug": "rokeach-instrumental",
+  "name": "Rokeach instrumental values",
+  "description": "Preferred modes of conduct commonly associated with the Rokeach Value Survey.",
+  "citation": "Rokeach, M. (1973). The Nature of Human Values. Free Press.",
+  "licenseNote": "Common value labels with new paraphrases; no proprietary administration or scoring materials included.",
+  "taxonomy": "Rokeach instrumental values",
+  "values": [
+    {"id":"ambitious","name":"Ambitious","definition":"Working hard and aspiring toward consequential goals.","category":"Competence"},
+    {"id":"broad-minded","name":"Broad-minded","definition":"Remaining open to unfamiliar ideas and perspectives.","category":"Intellectual"},
+    {"id":"capable","name":"Capable","definition":"Acting with competence and effectiveness.","category":"Competence"},
+    {"id":"cheerful","name":"Cheerful","definition":"Bringing lightness and positive spirit.","category":"Interpersonal"},
+    {"id":"clean","name":"Clean","definition":"Keeping oneself and surroundings orderly.","category":"Self-regulation"},
+    {"id":"courageous","name":"Courageous","definition":"Standing up for convictions despite risk.","category":"Moral"},
+    {"id":"forgiving","name":"Forgiving","definition":"Releasing resentment and allowing repair.","category":"Interpersonal"},
+    {"id":"helpful","name":"Helpful","definition":"Working for the welfare of others.","category":"Interpersonal"},
+    {"id":"honest","name":"Honest","definition":"Being sincere and truthful.","category":"Moral"},
+    {"id":"imaginative","name":"Imaginative","definition":"Generating original and creative possibilities.","category":"Intellectual"},
+    {"id":"independent","name":"Independent","definition":"Relying on one's own judgment and action.","category":"Self-direction"},
+    {"id":"intellectual","name":"Intellectual","definition":"Thinking carefully and pursuing understanding.","category":"Intellectual"},
+    {"id":"logical","name":"Logical","definition":"Reasoning consistently and coherently.","category":"Intellectual"},
+    {"id":"loving","name":"Loving","definition":"Expressing affection and care.","category":"Interpersonal"},
+    {"id":"loyal","name":"Loyal","definition":"Remaining faithful to people and commitments.","category":"Interpersonal"},
+    {"id":"obedient","name":"Obedient","definition":"Acting dutifully within legitimate expectations.","category":"Self-regulation"},
+    {"id":"polite","name":"Polite","definition":"Showing courtesy and consideration.","category":"Interpersonal"},
+    {"id":"responsible","name":"Responsible","definition":"Being dependable and accountable.","category":"Moral"}
+  ]
+}

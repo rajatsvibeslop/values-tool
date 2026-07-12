@@ -1,0 +1,30 @@
+{
+  "slug": "editable-card-sort",
+  "name": "Editable values card sort",
+  "description": "A generic, non-proprietary starter set designed for editing and expansion.",
+  "citation": "Values Tool original generic catalog (2026).",
+  "licenseNote": "Original CC0-style starter vocabulary; edit freely.",
+  "taxonomy": "Generic card sort",
+  "values": [
+    {"id":"authenticity","name":"Authenticity","definition":"Living in alignment with what one sincerely believes.","category":"Self"},
+    {"id":"belonging","name":"Belonging","definition":"Feeling accepted and connected to a group.","category":"Connection"},
+    {"id":"care","name":"Care","definition":"Attending to others' needs and flourishing.","category":"Connection"},
+    {"id":"curiosity","name":"Curiosity","definition":"Seeking new understanding and experience.","category":"Growth"},
+    {"id":"fairness","name":"Fairness","definition":"Treating people impartially and justly.","category":"Ethics"},
+    {"id":"freedom","name":"Freedom","definition":"Having meaningful choice over one's actions.","category":"Self"},
+    {"id":"growth","name":"Growth","definition":"Developing capacity, understanding, and maturity.","category":"Growth"},
+    {"id":"honesty","name":"Honesty","definition":"Representing reality and one's intentions truthfully.","category":"Ethics"},
+    {"id":"joy","name":"Joy","definition":"Making room for delight and aliveness.","category":"Wellbeing"},
+    {"id":"mastery","name":"Mastery","definition":"Building excellent skill through sustained practice.","category":"Growth"},
+    {"id":"meaning","name":"Meaning","definition":"Contributing to purposes experienced as significant.","category":"Purpose"},
+    {"id":"peace","name":"Peace","definition":"Reducing destructive conflict within and around oneself.","category":"Wellbeing"},
+    {"id":"responsibility","name":"Responsibility","definition":"Owning commitments and consequences.","category":"Ethics"},
+    {"id":"security","name":"Security","definition":"Maintaining safety and dependable foundations.","category":"Wellbeing"},
+    {"id":"service","name":"Service","definition":"Using one's effort for others or a larger cause.","category":"Purpose"},
+    {"id":"stewardship","name":"Stewardship","definition":"Caring responsibly for shared resources and future needs.","category":"Purpose"},
+    {"id":"tradition","name":"Tradition","definition":"Sustaining inherited practices that carry meaning.","category":"Continuity"},
+    {"id":"trust","name":"Trust","definition":"Relying on and being reliable to others.","category":"Connection"},
+    {"id":"wonder","name":"Wonder","definition":"Remaining receptive to awe and mystery.","category":"Growth"},
+    {"id":"stability","name":"Stability","definition":"Preserving continuity and predictability over time.","category":"Continuity"}
+  ]
+}

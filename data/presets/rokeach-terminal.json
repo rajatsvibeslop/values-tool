@@ -1,0 +1,28 @@
+{
+  "slug": "rokeach-terminal",
+  "name": "Rokeach terminal values",
+  "description": "Desired end states commonly associated with the Rokeach Value Survey.",
+  "citation": "Rokeach, M. (1973). The Nature of Human Values. Free Press.",
+  "licenseNote": "Common value labels with new paraphrases; no proprietary administration or scoring materials included.",
+  "taxonomy": "Rokeach terminal values",
+  "values": [
+    {"id":"comfortable-life","name":"A comfortable life","definition":"A prosperous and materially secure life.","category":"Personal"},
+    {"id":"exciting-life","name":"An exciting life","definition":"An active and stimulating life.","category":"Personal"},
+    {"id":"accomplishment","name":"A sense of accomplishment","definition":"A lasting contribution and meaningful achievement.","category":"Personal"},
+    {"id":"peace","name":"A world at peace","definition":"Freedom from war and destructive conflict.","category":"Social"},
+    {"id":"beauty","name":"A world of beauty","definition":"Beauty in nature and the arts.","category":"Social"},
+    {"id":"equality","name":"Equality","definition":"Equal opportunity and dignity for all.","category":"Social"},
+    {"id":"family-security","name":"Family security","definition":"Safety and care for loved ones.","category":"Interpersonal"},
+    {"id":"freedom","name":"Freedom","definition":"Independence and free choice.","category":"Personal"},
+    {"id":"happiness","name":"Happiness","definition":"Contentment and satisfaction with life.","category":"Personal"},
+    {"id":"inner-harmony","name":"Inner harmony","definition":"Freedom from inner conflict.","category":"Personal"},
+    {"id":"mature-love","name":"Mature love","definition":"Deep emotional and spiritual intimacy.","category":"Interpersonal"},
+    {"id":"national-security","name":"National security","definition":"Protection from external threat.","category":"Social"},
+    {"id":"pleasure","name":"Pleasure","definition":"An enjoyable and leisurely life.","category":"Personal"},
+    {"id":"salvation","name":"Salvation","definition":"A spiritually redeemed or enduring life.","category":"Spiritual"},
+    {"id":"self-respect","name":"Self-respect","definition":"A stable sense of personal worth.","category":"Personal"},
+    {"id":"social-recognition","name":"Social recognition","definition":"Respect and acknowledgment from others.","category":"Social"},
+    {"id":"friendship","name":"True friendship","definition":"Close, dependable companionship.","category":"Interpersonal"},
+    {"id":"wisdom","name":"Wisdom","definition":"A mature understanding of life.","category":"Personal"}
+  ]
+}

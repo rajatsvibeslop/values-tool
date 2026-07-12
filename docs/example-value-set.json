@@ -1,0 +1,17 @@
+{
+  "format": "values-tool-value-set",
+  "version": 1,
+  "name": "My working values",
+  "description": "Definitions I want to compare",
+  "source": { "author": "user" },
+  "values": [
+    {
+      "name": "Care",
+      "shortDefinition": "Actively supporting another person's flourishing.",
+      "personalDefinition": "Showing up when it materially helps.",
+      "parentCategory": "Connection",
+      "aliases": ["Compassion"],
+      "tags": ["relational"]
+    }
+  ]
+}

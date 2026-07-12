@@ -1,0 +1,9 @@
+{
+  "slug": "empty-custom",
+  "name": "Empty custom set",
+  "description": "A blank set for building a personal taxonomy from scratch.",
+  "citation": "User-authored.",
+  "licenseNote": "No bundled content.",
+  "taxonomy": "Custom",
+  "values": []
+}

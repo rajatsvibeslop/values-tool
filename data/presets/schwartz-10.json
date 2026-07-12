@@ -1,0 +1,20 @@
+{
+  "slug": "schwartz-10",
+  "name": "Schwartz 10 broad basic values",
+  "description": "Ten broad motivational value types from Schwartz's theory of basic human values.",
+  "citation": "Schwartz, S. H. (1992). Universals in the content and structure of values. Advances in Experimental Social Psychology, 25, 1-65.",
+  "licenseNote": "Names and original short paraphrases for educational personal use; no questionnaire items or scoring instrument included.",
+  "taxonomy": "Schwartz basic values",
+  "values": [
+    {"id":"self-direction","name":"Self-direction","definition":"Independent thought, choice, exploration, and creation.","category":"Openness to change"},
+    {"id":"stimulation","name":"Stimulation","definition":"Novelty, challenge, and variety in life.","category":"Openness to change"},
+    {"id":"hedonism","name":"Hedonism","definition":"Pleasure and sensuous gratification for oneself.","category":"Openness to change"},
+    {"id":"achievement","name":"Achievement","definition":"Demonstrating competence according to social standards.","category":"Self-enhancement"},
+    {"id":"power","name":"Power","definition":"Status, prestige, control, or dominance over resources and people.","category":"Self-enhancement"},
+    {"id":"security","name":"Security","definition":"Safety, harmony, and stability of self, relationships, and society.","category":"Conservation"},
+    {"id":"conformity","name":"Conformity","definition":"Restraint of actions likely to upset others or violate expectations.","category":"Conservation"},
+    {"id":"tradition","name":"Tradition","definition":"Respect for and commitment to inherited customs and ideas.","category":"Conservation"},
+    {"id":"benevolence","name":"Benevolence","definition":"Preserving and enhancing the welfare of close others.","category":"Self-transcendence"},
+    {"id":"universalism","name":"Universalism","definition":"Understanding, protecting, and promoting the welfare of all people and nature.","category":"Self-transcendence"}
+  ]
+}

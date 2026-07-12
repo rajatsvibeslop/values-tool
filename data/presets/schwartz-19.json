@@ -1,0 +1,29 @@
+{
+  "slug": "schwartz-19",
+  "name": "Schwartz refined 19-value model",
+  "description": "The refined motivational continuum of nineteen basic values.",
+  "citation": "Schwartz, S. H. et al. (2012). Refining the theory of basic individual values. Journal of Personality and Social Psychology, 103(4), 663-688.",
+  "licenseNote": "Value names and original short paraphrases only; no PVQ-RR instrument items or scoring keys included.",
+  "taxonomy": "Schwartz refined values",
+  "values": [
+    {"id":"self-direction-thought","name":"Self-direction: thought","definition":"Freedom to cultivate one's own ideas and abilities.","category":"Openness to change"},
+    {"id":"self-direction-action","name":"Self-direction: action","definition":"Freedom to determine one's own actions.","category":"Openness to change"},
+    {"id":"stimulation","name":"Stimulation","definition":"Excitement, novelty, and change.","category":"Openness to change"},
+    {"id":"hedonism","name":"Hedonism","definition":"Pleasure and sensuous gratification.","category":"Openness to change"},
+    {"id":"achievement","name":"Achievement","definition":"Success according to social standards.","category":"Self-enhancement"},
+    {"id":"power-dominance","name":"Power: dominance","definition":"Power exercised through control over people.","category":"Self-enhancement"},
+    {"id":"power-resources","name":"Power: resources","definition":"Power exercised through control of material and social resources.","category":"Self-enhancement"},
+    {"id":"face","name":"Face","definition":"Maintaining public image and avoiding humiliation.","category":"Self-enhancement"},
+    {"id":"security-personal","name":"Security: personal","definition":"Safety in one's immediate environment.","category":"Conservation"},
+    {"id":"security-societal","name":"Security: societal","definition":"Safety and stability in wider society.","category":"Conservation"},
+    {"id":"tradition","name":"Tradition","definition":"Maintaining and preserving cultural, family, or religious traditions.","category":"Conservation"},
+    {"id":"conformity-rules","name":"Conformity: rules","definition":"Compliance with rules, laws, and formal obligations.","category":"Conservation"},
+    {"id":"conformity-interpersonal","name":"Conformity: interpersonal","definition":"Avoiding harm or upset to other people.","category":"Conservation"},
+    {"id":"humility","name":"Humility","definition":"Recognizing one's insignificance in the larger scheme.","category":"Conservation"},
+    {"id":"benevolence-dependability","name":"Benevolence: dependability","definition":"Being reliable and trustworthy to close others.","category":"Self-transcendence"},
+    {"id":"benevolence-caring","name":"Benevolence: caring","definition":"Devotion to the welfare of close others.","category":"Self-transcendence"},
+    {"id":"universalism-concern","name":"Universalism: concern","definition":"Commitment to equality, justice, and protection for all people.","category":"Self-transcendence"},
+    {"id":"universalism-nature","name":"Universalism: nature","definition":"Preservation of the natural environment.","category":"Self-transcendence"},
+    {"id":"universalism-tolerance","name":"Universalism: tolerance","definition":"Acceptance and understanding of those who are different.","category":"Self-transcendence"}
+  ]
+}
