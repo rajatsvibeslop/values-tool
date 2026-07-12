@@ -126,6 +126,28 @@ describe("browser repository integration", () => {
     expect(repo.preparedRapidQuestion(sessionId)).toBeNull();
   });
 
+  it("keeps a rolling buffer when a prepared portrait is promoted", async () => {
+    const setId = await repo.importPreset("schwartz-19");
+    const sessionId = await repo.startSession(setId, "Buffered portraits", [], "portrait");
+    const current = repo.rapidQuestion(sessionId)!;
+    const prepared = await repo.prepareRapidQuestions(sessionId, 5);
+    expect(prepared.map((question) => question.question)).toEqual([2, 3, 4, 5, 6]);
+    const focal = current.scenario.choices!.slice(0, 3);
+    await repo.submitScenarioPortrait({
+      sessionId,
+      setId,
+      contexts: [],
+      mostChoiceId: focal[0]!.id,
+      leastChoiceId: focal[2]!.id,
+    });
+    expect(repo.rapidQuestion(sessionId)?.id).toBe(prepared[0]!.id);
+    expect(repo.preparedRapidQuestions(sessionId).map((question) => question.question)).toEqual([
+      3, 4, 5, 6,
+    ]);
+    const refilled = await repo.prepareRapidQuestions(sessionId, 5);
+    expect(refilled.map((question) => question.question)).toEqual([3, 4, 5, 6, 7]);
+  });
+
   it("continues a portrait session past its minimum pass while coverage is insufficient", async () => {
     const setId = await repo.importPreset("schwartz-19");
     const sessionId = await repo.startSession(setId, "Coverage pass", [], "portrait");

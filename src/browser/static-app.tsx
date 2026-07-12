@@ -53,6 +53,7 @@ import { DEFAULT_SETTINGS } from "@/db/defaults";
 import Papa from "papaparse";
 import {
   OpenAICompatibleScenarioProvider,
+  type GeneratedScenario,
   type HostedScenarioProvider,
   type ScenarioChoice,
 } from "@/domain/scenarios";
@@ -271,6 +272,9 @@ const scenarioConfig = (): ScenarioConfig => ({
   model: localStorage.getItem("scenario-model") || "",
   apiKey: sessionStorage.getItem("scenario-api-key") || "",
 });
+const scenarioGenerationInFlight = new Map<string, Promise<GeneratedScenario>>();
+const delay = (milliseconds: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, milliseconds));
 const Page = ({
   title,
   description,
@@ -1210,21 +1214,39 @@ function Compare({ repo, db, mutate }: ViewProps) {
           </Panel>
           <Panel title="Previous sessions">
             <div className="stack">
-              {sessions.map((item) => (
-                <button
-                  className="btn spread"
-                  key={item.id}
-                  onClick={() => {
-                    setSessionId(item.id);
-                    setCreating(false);
-                  }}
-                >
-                  <span>{item.name}</span>
-                  <span className="badge">
-                    {item.status} · {item.completed_count}
-                  </span>
-                </button>
-              ))}
+              {sessions.map((item) => {
+                const adaptive = repo.sessionMode(item.id) !== "exact";
+                return (
+                  <div className="row" key={item.id}>
+                    <button
+                      className="btn spread"
+                      style={{ flex: 1 }}
+                      onClick={() => {
+                        setSessionId(item.id);
+                        setCreating(false);
+                      }}
+                    >
+                      <span>{item.name}</span>
+                      <span className="badge">
+                        {item.status} · {item.completed_count}
+                      </span>
+                    </button>
+                    {adaptive && item.status === "completed" && (
+                      <button
+                        className="btn btn-primary"
+                        aria-label={`Continue ${item.name} until stable`}
+                        onClick={async () => {
+                          await mutate(() => repo.resumeSession(item.id));
+                          setSessionId(item.id);
+                          setCreating(false);
+                        }}
+                      >
+                        <RefreshCw size={14} /> Continue
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </Panel>
         </div>
@@ -1598,9 +1620,15 @@ function RapidCompare({
   const [notes, setNotes] = useState(false);
   const [mostChoiceId, setMostChoiceId] = useState("");
   const [choosing, setChoosing] = useState(false);
+  const [bufferStatus, setBufferStatus] = useState(() => {
+    const buffered = repo.preparedRapidQuestions(session.id);
+    return {
+      ready: buffered.filter((item) => item.scenario.provider !== "local").length,
+      total: buffered.length || 5,
+    };
+  });
   const attempted = useRef("");
   const interactionStarted = useRef(false);
-  const prefetching = useRef("");
   const sessionContextIds = db
     .query<{ context_id: string }>(
       "SELECT context_id FROM session_contexts WHERE session_id=?",
@@ -1630,12 +1658,25 @@ function RapidCompare({
       model: config.model,
     });
 
+  const requestHostedScenario = (
+    target: RapidQuestion,
+    config: ScenarioConfig,
+  ): Promise<GeneratedScenario> => {
+    const existing = scenarioGenerationInFlight.get(target.id);
+    if (existing) return existing;
+    const request = scenarioProvider(config)
+      .generate(scenarioRequest(target))
+      .finally(() => scenarioGenerationInFlight.delete(target.id));
+    scenarioGenerationInFlight.set(target.id, request);
+    return request;
+  };
+
   const generateScenario = async (automatic = false) => {
     const config = scenarioConfig();
-    if (config.provider === "local") return;
+    if (config.provider === "local") return false;
     if (!config.apiKey) {
       if (!automatic) setScenarioError("Add a scenario API key in Settings.");
-      return;
+      return false;
     }
     if (!automatic) {
       interactionStarted.current = false;
@@ -1644,59 +1685,91 @@ function RapidCompare({
     setGenerating(true);
     if (!automatic) setReplacingScenario(true);
     setScenarioError("");
-    try {
-      const generated = await scenarioProvider(config).generate(scenarioRequest(question));
-      if (!interactionStarted.current) {
-        await repo.updateRapidScenario(session.id, generated, question.id);
-        if (!interactionStarted.current) setScenario(generated);
+    const attempts = automatic ? 3 : 1;
+    let lastError = "Scenario generation failed";
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      try {
+        const generated = await requestHostedScenario(question, config);
+        if (!interactionStarted.current) {
+          await repo.updateRapidScenario(session.id, generated, question.id);
+          if (!interactionStarted.current) setScenario(generated);
+        }
+        setGenerating(false);
+        setReplacingScenario(false);
+        return true;
+      } catch (cause) {
+        lastError = cause instanceof Error ? cause.message : String(cause);
+        if (attempt + 1 < attempts) {
+          setScenarioError(`Generation failed. Retrying ${attempt + 2}/${attempts}…`);
+          await delay(800 * (attempt + 1));
+        }
       }
-    } catch (cause) {
-      sessionStorage.removeItem(`scenario-portraits:v5:${question.id}`);
-      const message = cause instanceof Error ? cause.message : String(cause);
-      if (!automatic)
-        setScenarioError(`${message}. The current choices are still available.`);
-    } finally {
-      setGenerating(false);
-      setReplacingScenario(false);
     }
+    setScenarioError(`${lastError}. Try again or change the generator in Settings.`);
+    setGenerating(false);
+    setReplacingScenario(false);
+    return false;
   };
 
-  const prefetchNextScenario = async () => {
+  const prefetchScenarioBuffer = async (retryRound = 0) => {
     const config = scenarioConfig();
     if (config.provider === "local" || !config.apiKey) return;
-    const prepared = await repo.prepareNextRapidQuestion(session.id);
-    if (!prepared || prepared.scenario.provider !== "local" || prefetching.current === prepared.id)
-      return;
-    prefetching.current = prepared.id;
-    try {
-      const generated = await scenarioProvider(config).generate(scenarioRequest(prepared));
-      await mutate(() => repo.updatePreparedRapidScenario(session.id, prepared.id, generated));
-    } catch {
-      // The prepared local portrait remains usable if hosted prefetching fails.
+    const buffer = await repo.prepareRapidQuestions(session.id, 5);
+    setBufferStatus({
+      ready: buffer.filter((item) => item.scenario.provider !== "local").length,
+      total: buffer.length,
+    });
+    const prepared = buffer.filter(
+      (item) => item.scenario.provider === "local",
+    );
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < prepared.length) {
+        const target = prepared[cursor++]!;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const generated = await requestHostedScenario(target, config);
+            await repo.updatePreparedRapidScenario(session.id, target.id, generated);
+            const updated = repo.preparedRapidQuestions(session.id);
+            setBufferStatus({
+              ready: updated.filter((item) => item.scenario.provider !== "local").length,
+              total: updated.length,
+            });
+            break;
+          } catch {
+            if (attempt === 0) await delay(1200);
+          }
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(2, prepared.length) }, worker));
+    const remaining = repo
+      .preparedRapidQuestions(session.id)
+      .some((item) => item.scenario.provider === "local");
+    if (remaining && retryRound < 2) {
+      await delay(2500 * (retryRound + 1));
+      await prefetchScenarioBuffer(retryRound + 1);
     }
   };
 
   useEffect(() => {
     const config = scenarioConfig();
-    const requestKey = `scenario-portraits:v5:${question.id}`;
     const needsCurrentScenario =
       config.provider !== "local" &&
       config.apiKey &&
       (scenario.provider === "local" ||
         (scenario.choices?.filter((choice) => choice.focalValueId).length ?? 0) < 2) &&
-      attempted.current !== question.id &&
-      !sessionStorage.getItem(requestKey);
+      attempted.current !== question.id;
     if (needsCurrentScenario) {
       attempted.current = question.id;
-      sessionStorage.setItem(requestKey, "started");
       void (async () => {
         await generateScenario(true);
-        await prefetchNextScenario();
+        await prefetchScenarioBuffer();
       })();
     } else {
-      void prefetchNextScenario();
+      void prefetchScenarioBuffer();
     }
-    // The request is keyed in sessionStorage; rerunning for other state is unnecessary.
+    // Generation is keyed by question id and shared across component lifetimes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [question.id]);
 
@@ -1727,6 +1800,8 @@ function RapidCompare({
   const awaitingHostedScenario =
     hostedScenarioMode &&
     (replacingScenario || (generating && scenario.provider === "local"));
+  const hostedScenarioFailed =
+    hostedScenarioMode && scenario.provider === "local" && !generating;
   const mostChoice = scenarioChoices.find((choice) => choice.id === mostChoiceId);
   const visibleScenarioChoices = mostChoice
     ? scenarioChoices.filter((choice) => choice.id !== mostChoice.id)
@@ -1763,6 +1838,13 @@ function RapidCompare({
               ? `Targeted question ${question.question}`
               : `${question.question}/${question.budget}`}
           </span>
+          {hostedScenarioMode && bufferStatus.total > 0 && (
+            <span className="badge" aria-label={`${bufferStatus.ready} of ${bufferStatus.total} upcoming questions ready`}>
+              {bufferStatus.ready >= bufferStatus.total && bufferStatus.total > 0
+                ? `${bufferStatus.total} ready`
+                : `${bufferStatus.ready}/${bufferStatus.total} ready`}
+            </span>
+          )}
           <button className="btn" onClick={onNewSession}>
             <Plus size={14} /> New session
           </button>
@@ -1822,6 +1904,17 @@ function RapidCompare({
             <div className="skeleton-line" />
           </div>
         </section>
+      ) : hostedScenarioFailed ? (
+        <section className="scenario-band" role="alert">
+          <TriangleAlert size={18} />
+          <div>
+            <span className="scenario-label">GENERATION PAUSED</span>
+            <p>{scenarioError || "The scenario provider did not return usable choices."}</p>
+            <button className="btn btn-sm" type="button" onClick={() => void generateScenario(true)}>
+              <RefreshCw size={14} /> Try again
+            </button>
+          </div>
+        </section>
       ) : (
         <section className="scenario-band" aria-live="polite">
           <Sparkles size={18} />
@@ -1836,7 +1929,7 @@ function RapidCompare({
         <div className="scenario-loading muted" aria-busy="true">
           <RefreshCw className="spin" size={20} /> Preparing people and choices…
         </div>
-      ) : useScenarioChoices ? (
+      ) : hostedScenarioFailed ? null : useScenarioChoices ? (
         <section className="scenario-actions" aria-label="Possible actions">
           <div className="portrait-instruction" aria-live="polite">
             <span className="scenario-label">STEP {mostChoice ? "2" : "1"} OF 2</span>
@@ -2904,6 +2997,7 @@ function ManualTierBrowser({
   values: ValueRow[];
   mutate: ViewProps["mutate"];
 }) {
+  const tierNames = ["S", "A", "B", "C", "D", "F"];
   const [saved, setSaved] = useState(false);
   const [tiers, setTiers] = useState(() => {
     const stored = db.query<{ id: string; name: string; position: number }>(
@@ -2911,13 +3005,13 @@ function ManualTierBrowser({
       [setId],
     );
     if (!stored.length)
-      return ["A", "B", "C", "Unplaced"].map((name, index) => ({
+      return [...tierNames, "Unplaced"].map((name, index, all) => ({
         name,
-        ids: index === 3 ? values.map((value) => value.id) : ([] as string[]),
+        ids: index === all.length - 1 ? values.map((value) => value.id) : ([] as string[]),
       }));
     const activeIds = new Set(values.map((value) => value.id));
     const assigned = new Set<string>();
-    const restored = stored.map((tier) => {
+    const restoredRaw = stored.map((tier) => {
       const ids = db
         .query<{ value_id: string }>(
           "SELECT value_id FROM manual_tier_values WHERE tier_id=? ORDER BY position",
@@ -2928,10 +3022,21 @@ function ManualTierBrowser({
       ids.forEach((id) => assigned.add(id));
       return { name: tier.name, ids };
     });
+    const restored = [
+      ...tierNames.map(
+        (name) => restoredRaw.find((tier) => tier.name === name) ?? { name, ids: [] },
+      ),
+      ...restoredRaw.filter(
+        (tier) => tier.name !== "Unplaced" && !tierNames.includes(tier.name),
+      ),
+    ];
     const missing = values.map((value) => value.id).filter((id) => !assigned.has(id));
-    const unplaced = restored.find((tier) => tier.name === "Unplaced");
-    if (unplaced) unplaced.ids.push(...missing);
-    else restored.push({ name: "Unplaced", ids: missing });
+    const unplaced = restoredRaw.find((tier) => tier.name === "Unplaced") ?? {
+      name: "Unplaced",
+      ids: [],
+    };
+    unplaced.ids.push(...missing);
+    restored.push(unplaced);
     return restored;
   });
   const drop = (id: string, target: number) =>
@@ -2945,6 +3050,10 @@ function ManualTierBrowser({
               : tier.ids.filter((value) => value !== id),
         }));
     });
+  const moveNext = (id: string) => {
+    const current = tiers.findIndex((tier) => tier.ids.includes(id));
+    drop(id, current < 0 || current === tiers.length - 1 ? 0 : current + 1);
+  };
   return (
     <>
       <div className="notice">
@@ -2966,12 +3075,15 @@ function ManualTierBrowser({
                 <button
                   className="btn btn-sm"
                   draggable
+                  type="button"
+                  title={`Move to ${tiers[index === tiers.length - 1 ? 0 : index + 1]!.name}`}
                   onDragStart={(event) =>
                     event.dataTransfer.setData("text/plain", id)
                   }
+                  onClick={() => moveNext(id)}
                   key={id}
                 >
-                  {values.find((value) => value.id === id)?.name}
+                  {values.find((value) => value.id === id)?.name || "Unnamed value"}
                 </button>
               ))}
             </div>

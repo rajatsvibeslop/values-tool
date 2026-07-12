@@ -244,28 +244,43 @@ export class BrowserRepository {
   }
 
   preparedRapidQuestion(sessionId: string): RapidQuestion | null {
+    return this.preparedRapidQuestions(sessionId)[0] ?? null;
+  }
+
+  preparedRapidQuestions(sessionId: string): RapidQuestion[] {
     const row = this.db.one<{ value: string }>(
       "SELECT value FROM application_settings WHERE key=?",
       [`rapid-prepared:${sessionId}`],
     );
-    return row ? parsed<RapidQuestion | null>(row.value, null) : null;
+    if (!row) return [];
+    const stored = parsed<RapidQuestion | RapidQuestion[] | null>(row.value, null);
+    return Array.isArray(stored) ? stored : stored ? [stored] : [];
   }
 
   async prepareNextRapidQuestion(sessionId: string): Promise<RapidQuestion | null> {
-    const existing = this.preparedRapidQuestion(sessionId);
-    if (existing) return existing;
+    return (await this.prepareRapidQuestions(sessionId, 1))[0] ?? null;
+  }
+
+  async prepareRapidQuestions(sessionId: string, count = 5): Promise<RapidQuestion[]> {
     const session = this.db.one<SessionRow>(
       "SELECT * FROM comparison_sessions WHERE id=?",
       [sessionId],
     );
     const current = this.rapidQuestion(sessionId);
-    if (!session || !current || current.question >= current.budget) return null;
-    const prepared = this.buildRapidQuestion(
-      session,
-      session.completed_count + 1,
-      current.valueIds,
-    );
-    if (!prepared) return null;
+    if (!session || !current) return [];
+    const prepared = this.preparedRapidQuestions(sessionId)
+      .filter((question) => question.question > current.question)
+      .slice(0, count);
+    while (prepared.length < count) {
+      const previous = prepared.at(-1) ?? current;
+      const next = this.buildRapidQuestion(
+        session,
+        current.question + prepared.length,
+        previous.valueIds,
+      );
+      if (!next) break;
+      prepared.push(next);
+    }
     await this.db.transaction(() =>
       this.db.run(
         "INSERT INTO application_settings(key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at",
@@ -280,11 +295,13 @@ export class BrowserRepository {
     expectedQuestionId: string,
     scenario: GeneratedScenario,
   ): Promise<void> {
-    const prepared = this.preparedRapidQuestion(sessionId);
-    if (prepared?.id === expectedQuestionId) {
+    const prepared = this.preparedRapidQuestions(sessionId);
+    const index = prepared.findIndex((question) => question.id === expectedQuestionId);
+    if (index >= 0) {
+      prepared[index] = { ...prepared[index]!, scenario };
       await this.db.transaction(() =>
         this.db.run("UPDATE application_settings SET value=?,updated_at=? WHERE key=?", [
-          json({ ...prepared, scenario }),
+          json(prepared),
           now(),
           `rapid-prepared:${sessionId}`,
         ]),
@@ -1066,9 +1083,15 @@ export class BrowserRepository {
     const questionBudget = portraitMode
       ? portraitQuestionBudget(values.length)
       : rapidQuestionBudget(values.length);
-    const prepared = this.preparedRapidQuestion(session.id);
-    const group = prepared?.question === session.completed_count + 1
-      ? prepared
+    const prepared = this.preparedRapidQuestions(session.id);
+    const promoted = prepared.find(
+      (question) => question.question === session.completed_count + 1,
+    );
+    const remainingPrepared = promoted
+      ? prepared.filter((question) => question.question > promoted.question)
+      : [];
+    const group = promoted
+      ? promoted
       : this.buildRapidQuestion(session, session.completed_count);
     const stamp = now();
     if (!group) {
@@ -1098,9 +1121,15 @@ export class BrowserRepository {
     }
     const question = group;
     await this.db.transaction(() => {
-      this.db.run("DELETE FROM application_settings WHERE key=?", [
-        `rapid-prepared:${session.id}`,
-      ]);
+      if (remainingPrepared.length)
+        this.db.run(
+          "UPDATE application_settings SET value=?,updated_at=? WHERE key=?",
+          [json(remainingPrepared), stamp, `rapid-prepared:${session.id}`],
+        );
+      else
+        this.db.run("DELETE FROM application_settings WHERE key=?", [
+          `rapid-prepared:${session.id}`,
+        ]);
       this.db.run("DELETE FROM comparison_queue WHERE session_id=?", [session.id]);
       this.db.run(
         "INSERT INTO comparison_queue VALUES (?,?,?,?,?,?,?,?)",

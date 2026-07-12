@@ -30,6 +30,7 @@
 - [x] Committed Swiss instrument visual system and bundled typography
 - [x] Rapid ranking with a sub-100-question minimum pass and convergence-driven continuation
 - [x] Automatic scenario generation with local, OpenRouter Free, and DeepSeek providers
+- [x] Persisted five-question scenario buffer with bounded retries and rolling adaptive refill
 - [x] Transactional evidence reset for one value set or the full workspace
 
 ## Key Decisions

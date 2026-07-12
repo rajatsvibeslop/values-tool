@@ -141,6 +141,20 @@ test("saves and reloads manual tiers", async ({ page }, testInfo) => {
   await expect(page.locator(".tier-row").filter({ hasText: /^A/ })).toContainText(valueName);
 });
 
+test("shows Broad 100 manual tiers before any comparison session", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "One large-set rendering check is sufficient");
+  await page.locator(".preset-row").filter({ hasText: "Broad 100 personal values" }).getByRole("button", { name: "Use set" }).click();
+  await page.locator('a[href="#rankings"]').first().click();
+  await page.getByLabel("More ranking views").selectOption("manual");
+  const chips = page.locator(".tier-values button");
+  await expect(chips).toHaveCount(100);
+  expect(await chips.allTextContents()).not.toContain("");
+  await expect(page.locator(".tier-label")).toHaveText(["S", "A", "B", "C", "D", "F", "Unplaced"]);
+  await expect(page.locator(".tier-row").filter({ hasText: "Unplaced" })).toContainText("Autonomy");
+  await page.getByRole("button", { name: "Autonomy" }).click();
+  await expect(page.locator(".tier-row").filter({ hasText: /^S/ })).toContainText("Autonomy");
+});
+
 test("stores hosted scenario credentials only for the browser tab", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "chromium", "One settings check is sufficient");
   await page.locator('a[href="#settings"]').first().click();
@@ -151,6 +165,7 @@ test("stores hosted scenario credentials only for the browser tab", async ({ pag
   expect(await page.evaluate(() => sessionStorage.getItem("scenario-api-key"))).toBe("test-session-key");
   expect(await page.evaluate(() => localStorage.getItem("scenario-provider"))).toBe("openrouter");
   let scenarioRequests = 0;
+  let scenarioResponses = 0;
   await page.route("https://openrouter.ai/api/v1/chat/completions", async (route) => {
     scenarioRequests += 1;
     const body = route.request().postDataJSON() as {
@@ -170,7 +185,14 @@ test("stores hosted scenario credentials only for the browser tab", async ({ pag
     expect(body.plugins).toEqual([{ id: "response-healing" }]);
     expect(body.provider.require_parameters).toBe(true);
     expect(body.provider.sort).toBe("latency");
+    if (scenarioRequests === 1)
+      return route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({ error: { message: "Temporary provider congestion" } }),
+      });
     await new Promise((resolve) => setTimeout(resolve, 300));
+    scenarioResponses += 1;
     return route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -192,7 +214,9 @@ test("stores hosted scenario credentials only for the browser tab", async ({ pag
   await expect(page.getByText("GENERATING DECISION")).toBeVisible();
   await expect(page.getByText(/secure familiar role/)).toBeVisible();
   await expect(page.locator(".scenario-choice")).toHaveCount(3);
-  await expect.poll(() => scenarioRequests).toBeGreaterThanOrEqual(2);
+  await expect.poll(() => scenarioRequests).toBeGreaterThanOrEqual(7);
+  await expect.poll(() => scenarioResponses).toBeGreaterThanOrEqual(6);
+  await expect(page.getByText("5 ready", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "None fit" }).click();
   await expect.poll(() => scenarioRequests).toBeGreaterThanOrEqual(3);
   await expect(page.getByText("1/20", { exact: true })).toBeVisible();
@@ -200,6 +224,8 @@ test("stores hosted scenario credentials only for the browser tab", async ({ pag
   await expect(page.getByText("Who is least like you?")).toBeVisible();
   await page.getByRole("button", { name: /Negotiate the career offer/ }).click();
   await expect(page.getByText("2/20", { exact: true })).toBeVisible();
+  await expect(page.getByText("GENERATING DECISION")).toBeHidden();
+  await expect(page.getByText(/company makes the career offer/i)).toBeVisible();
 });
 
 test("resets ranking evidence while preserving the value set", async ({ page }, testInfo) => {

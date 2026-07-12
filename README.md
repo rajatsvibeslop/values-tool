@@ -149,10 +149,12 @@ All portraits are constrained to the same actors, facts, stakes, and decision. A
 may not introduce a private obligation, hazard, relationship, or other fact absent from
 the shared scenario; **None fit** discards a bad stimulus without recording evidence.
 
-Question navigation never requires a generation click. A deterministic local portrait is
-available as a failure fallback. Normal hosted sessions display an explicit loading state;
-the next adaptive portrait is selected and generated while the current question is being
-answered, so it is normally ready before navigation.
+Question navigation never requires a generation click. Hosted sessions display an explicit
+loading or failure state and never present the local placeholder as a completed generated
+question. A persisted rolling buffer keeps five upcoming matchups ready, generates with two
+background workers, retries transient failures, and retains unused questions as each answer
+is submitted. Matchmaking continuously refills the tail from the latest posterior, accepting
+a bounded five-question adaptivity lag in exchange for wait-free navigation.
 
 ## Exact Ordering and Adaptive Verification
 
