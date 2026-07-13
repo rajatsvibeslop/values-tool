@@ -59,35 +59,27 @@ import {
   type ScenarioChoice,
 } from "@/domain/scenarios";
 
-type Route =
-  | "dashboard"
-  | "compare"
-  | "queue"
-  | "rankings"
-  | "values"
-  | "tensions"
-  | "history"
-  | "reports"
-  | "data"
-  | "settings"
-  | "search";
+type Route = "quiz" | "reports" | "settings";
 const nav: [Route, string, typeof Activity][] = [
-  ["dashboard", "Dashboard", Activity],
-  ["compare", "Compare", ArrowLeftRight],
-  ["queue", "Queue", ListOrdered],
-  ["rankings", "Rankings", BarChart3],
-  ["values", "Values", Tags],
-  ["tensions", "Tensions", TriangleAlert],
-  ["history", "History", History],
+  ["quiz", "Quiz", ArrowLeftRight],
   ["reports", "Reports", FileText],
-  ["data", "Data", Database],
   ["settings", "Settings", Settings],
 ];
 const routeFromHash = (): Route => {
-  const value = location.hash.slice(1).split("?")[0] as Route;
-  return nav.some(([route]) => route === value) || value === "search"
-    ? value
-    : "dashboard";
+  const value = location.hash.slice(1).split("?")[0];
+  if (nav.some(([route]) => route === value)) return value as Route;
+  if (
+    value === "dashboard" ||
+    value === "compare" ||
+    value === "queue" ||
+    value === "rankings" ||
+    value === "values" ||
+    value === "tensions" ||
+    value === "history" ||
+    value === "data" ||
+    value === "search"
+  ) return "quiz";
+  return "quiz";
 };
 
 export function StaticApp() {
@@ -169,11 +161,11 @@ export function StaticApp() {
   return (
     <div className="app-shell" data-revision={revision}>
       <aside className="sidebar">
-        <a className="brand" href="#dashboard">
+        <a className="brand" href="#quiz">
           <span className="brand-mark">
             <SlidersHorizontal size={16} />
           </span>
-          <span>Values Tool</span>
+          <span>Values Lab</span>
         </a>
         <nav className="nav-list" aria-label="Primary navigation">
           {nav.map(([href, label, Icon]) => (
@@ -199,21 +191,10 @@ export function StaticApp() {
       </aside>
       <div className="content-shell">
         <header className="topbar">
-          <form
-            className="search-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              const query = new FormData(event.currentTarget).get("q");
-              location.hash = `search?q=${encodeURIComponent(String(query))}`;
-            }}
-          >
-            <Search size={16} />
-            <input
-              name="q"
-              aria-label="Search all records"
-              placeholder="Search values, notes, claims, tensions..."
-            />
-          </form>
+          <div className="topbar-title">
+            <strong>Values Lab</strong>
+            <span className="muted small">Quiz / Reports / Settings</span>
+          </div>
         </header>
         <main>
           {error && (
@@ -243,17 +224,10 @@ function Router({
   mutate: (work: () => Promise<unknown>) => Promise<void>;
 }) {
   const props = { repo, db, mutate };
-  if (route === "dashboard") return <Dashboard {...props} />;
-  if (route === "values") return <ValuesView {...props} />;
-  if (route === "compare") return <Compare {...props} />;
-  if (route === "queue") return <Queue {...props} />;
-  if (route === "rankings") return <Rankings {...props} />;
-  if (route === "tensions") return <Tensions {...props} />;
-  if (route === "history") return <HistoryView {...props} />;
+  if (route === "quiz") return <Compare {...props} />;
   if (route === "reports") return <Reports {...props} />;
-  if (route === "data") return <DataView {...props} />;
   if (route === "settings") return <SettingsView {...props} />;
-  return <SearchView {...props} />;
+  return <Compare {...props} />;
 }
 
 type ViewProps = {
@@ -372,13 +346,13 @@ function useSelectedSet(repo: BrowserRepository) {
   return { sets, set, select };
 }
 
-function Dashboard({ repo, db, mutate }: ViewProps) {
+function Quiz({ repo, db, mutate }: ViewProps) {
   const { sets, set, select } = useSelectedSet(repo);
   if (!set)
     return (
       <Page
-        title="Dashboard"
-        description="Rank personal values through adaptive comparisons while preserving the evidence behind every choice."
+        title="Quiz"
+        description="Start a session and answer the shortest possible next question."
       >
         <Panel title="Choose a starting value set">
           <div className="preset-list">
@@ -450,8 +424,8 @@ function Dashboard({ repo, db, mutate }: ViewProps) {
   });
   return (
     <Page
-      title="Dashboard"
-      description={`${set.name} · global evidence across ${values.length} active values`}
+      title="Quiz"
+      description={`${set.name} · ${values.length} values`}
       actions={
         <select
           className="select"
@@ -525,7 +499,7 @@ function Dashboard({ repo, db, mutate }: ViewProps) {
             </div>
           ) : (
             <Empty title="No evidence yet">
-              <a className="btn" href="#compare">
+              <a className="btn" href="#quiz">
                 Start comparing
               </a>
             </Empty>
@@ -555,7 +529,7 @@ function Dashboard({ repo, db, mutate }: ViewProps) {
           </Panel>
           <Panel title="Resume work">
             {resumableSession ? (
-              <a className="btn btn-primary" href="#compare">
+              <a className="btn btn-primary" href="#quiz">
                 Resume {resumableSession.name}
               </a>
             ) : completedAdaptiveSession &&
@@ -565,13 +539,13 @@ function Dashboard({ repo, db, mutate }: ViewProps) {
                 className="btn btn-primary"
                 onClick={async () => {
                   await mutate(() => repo.resumeSession(completedAdaptiveSession.id));
-                  location.hash = "#compare";
+                  location.hash = "#quiz";
                 }}
               >
                 Continue until stable
               </button>
             ) : (
-              <a className="btn" href="#compare">
+              <a className="btn" href="#quiz">
                 Start a session
               </a>
             )}
@@ -1122,7 +1096,7 @@ function Compare({ repo, db, mutate }: ViewProps) {
   const activeSession = sessions.find((item) => item.status === "active");
   const [sessionId, setSessionId] = useState(activeSession?.id ?? "");
   const [creating, setCreating] = useState(!activeSession);
-  const [sessionMode, setSessionMode] = useState<"rapid" | "exact">("rapid");
+  const sessionMode = "portrait" as const;
   const [newSetId, setNewSetId] = useState(
     localStorage.getItem("values-set") ??
       sets[0]?.id ??
@@ -1192,11 +1166,11 @@ function Compare({ repo, db, mutate }: ViewProps) {
   if (creating || !session)
     return (
       <Page
-        title="Compare"
-        description="Start a purpose-specific session with optional contexts. The selected value set is fixed for that session."
+        title="Quiz"
+        description="Start a session."
       >
         <div className="grid two-col">
-          <Panel title="New session">
+          <Panel title="Start quiz">
             <form
                 className="stack"
                 onSubmit={(event) => {
@@ -1209,9 +1183,7 @@ function Compare({ repo, db, mutate }: ViewProps) {
                       selectedSetId,
                       String(data.get("name")),
                       data.getAll("contexts").map(String),
-                      sessionMode === "rapid" && scenarioConfig().provider !== "local"
-                        ? "portrait"
-                        : sessionMode,
+                      sessionMode,
                     );
                     localStorage.setItem("values-set", selectedSetId);
                     setNewSetId(selectedSetId);
@@ -1250,20 +1222,6 @@ function Compare({ repo, db, mutate }: ViewProps) {
                     )}
                   </select>
                 </Field>
-                <Field label="Method">
-                  <select
-                    className="select"
-                    value={sessionMode}
-                    onChange={(event) => setSessionMode(event.target.value as "rapid" | "exact")}
-                  >
-                    <option value="rapid">
-                      {scenarioConfig().provider === "local"
-                        ? "Rapid ordering · arrange 5 values"
-                        : "Scenario decisions · choose an action"}
-                    </option>
-                    <option value="exact">Direct ranking · compare 2 values</option>
-                  </select>
-                </Field>
                 <div className="notice small">
                   This session will compare{" "}
                   <strong>
@@ -1286,11 +1244,11 @@ function Compare({ repo, db, mutate }: ViewProps) {
                   ))}
                 </div>
                 <button className="btn btn-primary" type="submit">
-                  Start session
+                  Start
                 </button>
               </form>
           </Panel>
-          <Panel title="Previous sessions">
+          <Panel title="Recent sessions">
             <div className="stack">
               {sessions.map((item) => {
                 const adaptive = repo.sessionMode(item.id) !== "exact";
@@ -1347,7 +1305,7 @@ function Compare({ repo, db, mutate }: ViewProps) {
   if (!pair || !left || !right)
     return (
       <Page
-        title={session.name}
+        title="Quiz"
         description={
           exactProgress?.complete || session.status === "completed"
             ? "Ordering complete."
@@ -1355,7 +1313,7 @@ function Compare({ repo, db, mutate }: ViewProps) {
         }
         actions={
           <button className="btn" onClick={() => setCreating(true)}>
-            <Plus size={14} /> New session
+            <Plus size={14} /> New
           </button>
         }
       >
@@ -1387,7 +1345,7 @@ function Compare({ repo, db, mutate }: ViewProps) {
               className="btn btn-primary"
               onClick={() => mutate(() => repo.regenerateQueue(session.id))}
             >
-              <RefreshCw size={15} /> Continue ordering
+              <RefreshCw size={15} /> Continue
             </button>
           )}
         </Panel>
@@ -1407,7 +1365,7 @@ function Compare({ repo, db, mutate }: ViewProps) {
         {exactProgress?.placed ?? 0}/{exactProgress?.total ?? values.length} placed
       </span>
       <button className="btn" type="button" onClick={() => setCreating(true)}>
-        <Plus size={14} /> New session
+        <Plus size={14} /> New
       </button>
       <button
         className="btn"
@@ -1428,8 +1386,8 @@ function Compare({ repo, db, mutate }: ViewProps) {
     </div>
   );
   return (
-    <Page
-      title={session.name}
+      <Page
+      title="Quiz"
       description={pair.reason}
       actions={sessionActions}
     >
@@ -1685,10 +1643,6 @@ function RapidCompare({
   contexts: ContextRow[];
   onNewSession: () => void;
 }) {
-  const questionValues = question.valueIds
-    .map((id) => values.find((value) => value.id === id))
-    .filter((value): value is ValueRow => Boolean(value));
-  const [order, setOrder] = useState(question.valueIds);
   const [scenario, setScenario] = useState(question.scenario);
   const [scenarioError, setScenarioError] = useState("");
   const [generating, setGenerating] = useState(
@@ -1698,7 +1652,6 @@ function RapidCompare({
     },
   );
   const [replacingScenario, setReplacingScenario] = useState(false);
-  const [notes, setNotes] = useState(false);
   const [mostChoiceId, setMostChoiceId] = useState("");
   const [choosing, setChoosing] = useState(false);
   const [bufferStatus, setBufferStatus] = useState(() => {
@@ -1762,10 +1715,16 @@ function RapidCompare({
   };
 
   const generateScenario = async (automatic = false) => {
+    if (!automatic) {
+      await repo.skipRapidQuestion({
+        sessionId: session.id,
+        setId: session.value_set_id,
+      });
+      return true;
+    }
     const config = scenarioConfig();
-    if (config.provider === "local") return false;
     if (!config.apiKey) {
-      if (!automatic) setScenarioError("Add a scenario API key in Settings.");
+      setScenarioError("Add a scenario API key in Settings.");
       return false;
     }
     if (!automatic) {
@@ -1869,31 +1828,13 @@ function RapidCompare({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [question.id]);
 
-  const move = (index: number, delta: number) =>
-    setOrder((current) => {
-      const next = [...current];
-      const target = index + delta;
-      if (target < 0 || target >= next.length) return current;
-      [next[index], next[target]] = [next[target]!, next[index]!];
-      return next;
-    });
-  const reorder = (sourceId: string, targetId: string) =>
-    setOrder((current) => {
-      const source = current.indexOf(sourceId);
-      const target = current.indexOf(targetId);
-      if (source < 0 || target < 0 || source === target) return current;
-      const next = [...current];
-      next.splice(source, 1);
-      next.splice(target, 0, sourceId);
-      return next;
-    });
   const scenarioChoices = (scenario.choices ?? []).filter(
     (choice) =>
       question.valueIds.includes(choice.focalValueId),
   );
   const hostedScenarioMode = scenarioConfig().provider !== "local";
   const currentScenarioReady = scenarioMatchesConfig(scenario, scenarioConfig());
-  const useScenarioChoices = hostedScenarioMode && scenarioChoices.length >= 2;
+  const useScenarioChoices = scenarioChoices.length >= 2;
   const awaitingHostedScenario =
     hostedScenarioMode &&
     (replacingScenario || (generating && !currentScenarioReady));
@@ -1925,8 +1866,8 @@ function RapidCompare({
   };
 
   return (
-    <Page
-      title={session.name}
+      <Page
+      title="Quiz"
       description={question.reason}
       actions={
         <div className="row">
@@ -1943,7 +1884,7 @@ function RapidCompare({
             </span>
           )}
           <button className="btn" onClick={onNewSession}>
-            <Plus size={14} /> New session
+            <Plus size={14} /> New
           </button>
           <button
             className="btn"
@@ -1968,11 +1909,7 @@ function RapidCompare({
               : `QUESTION ${question.question} OF ${question.budget}`}
           </span>
           <strong>
-            {hostedScenarioMode
-              ? mostChoiceId
-                ? "Who is least like you?"
-                : "Who is most like you?"
-              : "Order what matters."}
+            {mostChoiceId ? "Who is least like you?" : "Who is most like you?"}
           </strong>
         </div>
         <div className="ordering-progress">
@@ -1985,11 +1922,7 @@ function RapidCompare({
           />
         </div>
         <span className="mono muted">
-          {question.continuing
-            ? "until stable"
-            : hostedScenarioMode
-              ? "most + least"
-              : "5 at a time"}
+          {question.continuing ? "until stable" : "most + least"}
         </span>
       </div>
       {awaitingHostedScenario ? (
@@ -2066,64 +1999,11 @@ function RapidCompare({
             </button>
           </div>
         </section>
-      ) : hostedScenarioMode ? (
+      ) : (
         <div className="scenario-loading muted">
           {generating ? "Preparing choices…" : "Preparing another scenario…"}
         </div>
-      ) : <form
-        onSubmit={(event) => {
-          const data = submit(event);
-          mutate(() =>
-            repo.submitRapidRanking({
-              sessionId: session.id,
-              setId: session.value_set_id,
-              orderedValueIds: order,
-              contexts: sessionContextIds,
-              reasoning: String(data.get("reasoning") ?? ""),
-            }),
-          );
-        }}
-      >
-        <div className="rapid-rank-list">
-          {order.map((valueId, index) => {
-            const value = questionValues.find((item) => item.id === valueId)!;
-            return (
-              <article
-                className="rapid-rank-row"
-                draggable
-                key={value.id}
-                onDragStart={(event) => event.dataTransfer.setData("text/value-id", value.id)}
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => reorder(event.dataTransfer.getData("text/value-id"), value.id)}
-              >
-                <span className="rapid-rank-number">{index + 1}</span>
-                <GripVertical className="muted" size={18} aria-hidden="true" />
-                <div className="rapid-rank-copy">
-                  <strong>{value.name}</strong>
-                  <span>{value.personal_definition || value.short_definition}</span>
-                </div>
-                <div className="rapid-rank-actions">
-                  <button type="button" className="btn btn-icon btn-sm" disabled={index === 0} onClick={() => move(index, -1)} title="Move up">
-                    <ArrowUp size={14} />
-                  </button>
-                  <button type="button" className="btn btn-icon btn-sm" disabled={index === order.length - 1} onClick={() => move(index, 1)} title="Move down">
-                    <ArrowDown size={14} />
-                  </button>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-        <div className="rapid-submit">
-          <button type="button" className="btn" onClick={() => setNotes((value) => !value)}>
-            Add note
-          </button>
-          {notes && <input className="input" name="reasoning" placeholder="Why this order?" />}
-          <button className="btn btn-primary" type="submit">
-            <Check size={15} /> Use this order
-          </button>
-        </div>
-      </form>}
+      )}
     </Page>
   );
 }
@@ -2188,7 +2068,7 @@ function Queue({ repo, db, mutate }: ViewProps) {
                     <strong>{values.find((value) => value.id === id)?.name}</strong>
                   </div>
                 ))}
-                <a className="btn btn-primary" href="#compare">Rank these values</a>
+                <a className="btn btn-primary" href="#quiz">Rank these values</a>
               </div>
             ) : <div className="table-wrap">
               <table className="table">
@@ -2303,7 +2183,7 @@ function Queue({ repo, db, mutate }: ViewProps) {
       ) : (
         <Panel>
           <Empty title="No session">
-            <a className="btn" href="#compare">
+            <a className="btn" href="#quiz">
               Start comparing
             </a>
           </Empty>
@@ -2480,7 +2360,7 @@ function SharedRankings({ result }: { result: SharedResult }) {
         </div>
       </Panel>
       <div className="form-actions">
-        <a className="btn btn-primary" href="#dashboard">
+        <a className="btn btn-primary" href="#quiz">
           Open your local workspace
         </a>
       </div>

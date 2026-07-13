@@ -1,6 +1,6 @@
-# Values Tool
+# Values Lab
 
-Values Tool is a local-first analytical application for ranking personal values through adaptive pairwise and five-value questions. Rapid sessions rank five values at once; an optional finite pairwise scheduler remains available for exact ordering. A TrueSkill-style Bayesian model retains uncertainty, tiers, and context dependence. Every decision can preserve the user's original reasoning as evidence.
+Values Lab is a local-first application for ranking personal values through a fast quiz flow. The browser surface is centered on three areas: Quiz, Reports, and Settings. A Bayesian rating model retains uncertainty, tiers, and context dependence, and the app preserves the underlying evidence and history locally.
 
 The application has two delivery adapters:
 

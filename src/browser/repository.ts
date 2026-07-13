@@ -1449,6 +1449,34 @@ export class BrowserRepository {
     await this.regenerateQueue(input.sessionId);
   }
 
+  async skipRapidQuestion(input: {
+    sessionId: string;
+    setId: string;
+  }): Promise<void> {
+    const session = this.db.one<SessionRow>(
+      "SELECT * FROM comparison_sessions WHERE id=?",
+      [input.sessionId],
+    );
+    if (!session) throw new Error("Session not found");
+    const question = this.rapidQuestion(input.sessionId);
+    if (!question) throw new Error("Rapid question not found");
+    const stamp = now();
+    await this.db.transaction(() => {
+      this.db.run(
+        "UPDATE comparison_sessions SET completed_count=completed_count+1,updated_at=? WHERE id=?",
+        [stamp, input.sessionId],
+      );
+      this.db.run("DELETE FROM comparison_queue WHERE session_id=?", [
+        input.sessionId,
+      ]);
+      this.db.run("DELETE FROM application_settings WHERE key=?", [
+        `rapid-question:${input.sessionId}`,
+      ]);
+    });
+    await this.regenerateQueue(input.sessionId);
+    await this.refreshTensions(input.setId);
+  }
+
   async submit(input: {
     sessionId: string;
     setId: string;
