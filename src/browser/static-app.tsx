@@ -1103,12 +1103,10 @@ function Compare({ repo, db, mutate }: ViewProps) {
   const defaultDomain =
     quizDomains.find((domain) => domain.id === defaultDomainId) ?? quizDomains[0];
   const [startDomainId, setStartDomainId] = useState<string>(defaultDomain?.id ?? defaultDomainId);
-  const [startContextPreset, setStartContextPreset] = useState(
-    localStorage.getItem("quiz-context-preset") || defaultDomain?.contextPrompt || "",
-  );
   const [startContextText, setStartContextText] = useState(
-    localStorage.getItem("quiz-context-details") || "",
+    localStorage.getItem("quiz-context-details") || defaultDomain?.contextPrompt || "",
   );
+  const lastContextSeed = useRef(startContextText);
   const [startChoiceCount, setStartChoiceCount] = useState(
     Math.min(
       7,
@@ -1214,14 +1212,12 @@ function Compare({ repo, db, mutate }: ViewProps) {
                 sessionMode,
                 {
                   domainId: resolvedDomain?.id ?? "general-life",
-                  contextPreset: startContextPreset,
                   contextText: startContextText,
                   choiceCount: startChoiceCount,
                 },
               );
               localStorage.setItem("values-set", selectedSetId);
               localStorage.setItem("quiz-domain", startDomainId);
-              localStorage.setItem("quiz-context-preset", startContextPreset);
               localStorage.setItem("quiz-context-details", startContextText);
               localStorage.setItem("quiz-choice-count", String(startChoiceCount));
               setSessionId(id);
@@ -1241,7 +1237,10 @@ function Compare({ repo, db, mutate }: ViewProps) {
                   setStartDomainId(next);
                   const domain = quizDomains.find((item) => item.id === next);
                   if (domain) {
-                    setStartContextPreset(domain.contextPrompt);
+                    if (!startContextText.trim() || startContextText === lastContextSeed.current) {
+                      lastContextSeed.current = domain.contextPrompt;
+                      setStartContextText(domain.contextPrompt);
+                    }
                     if (domain.valueSetId) setStartSetChoice(domain.valueSetId);
                   }
                 }}
@@ -1253,30 +1252,18 @@ function Compare({ repo, db, mutate }: ViewProps) {
                 ))}
               </select>
             </div>
-            <div className="field">
-              <label htmlFor="context">Context</label>
-              <select
-                id="context"
-                className="select"
-                value={startContextPreset}
-                onChange={(event) => setStartContextPreset(event.target.value)}
-              >
-                <option value={selectedDomain?.contextPrompt ?? ""}>
-                  {selectedDomain?.contextPrompt ?? "General life"}
-                </option>
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="details">Life / work / situation details</label>
+            <details className="context-disclosure">
+              <summary className="context-summary">
+                <span>Context</span>
+              </summary>
               <textarea
-                id="details"
-                className="textarea"
+                className="textarea context-textarea"
                 value={startContextText}
                 onChange={(event) => setStartContextText(event.target.value)}
                 placeholder="Tell it about your job, life, situation, or constraints..."
-                rows={3}
+                rows={4}
               />
-            </div>
+            </details>
             <div className="field">
               <label>Choices per question</label>
               <div className="choice-toggle" role="group" aria-label="Choices per question">
@@ -1700,10 +1687,7 @@ function RapidCompare({
     })),
     contexts: contextNames,
     contextText: sessionQuizConfig
-      ? [sessionQuizConfig.contextPreset, sessionQuizConfig.contextText]
-          .map((item) => item.trim())
-          .filter(Boolean)
-          .join(". ")
+      ? [sessionQuizConfig.contextText].map((item) => item.trim()).filter(Boolean).join(". ")
       : contextNames.join(", "),
     domain:
       settings.quiz.domains.find((domain) => domain.id === sessionQuizConfig?.domainId)?.name ??
@@ -1899,9 +1883,7 @@ function RapidCompare({
       actions={
         <div className="row">
           <span className="badge">
-            {question.continuing
-              ? `Targeted question ${question.question}`
-              : `${question.question}/${question.budget}`}
+            {question.continuing ? `Targeted question ${question.question}` : `Question ${question.question}`}
           </span>
           {hostedScenarioMode && bufferStatus.total > 0 && (
             <span className="badge" aria-label={`${bufferStatus.ready} of ${bufferStatus.total} upcoming questions ready`}>
@@ -1929,28 +1911,28 @@ function RapidCompare({
       }
     >
       <div className="ordering-strip rapid-strip">
-        <div>
-          <span className="ordering-label">
-            {question.continuing
-              ? `TARGETED QUESTION ${question.question}`
-              : `QUESTION ${question.question} OF ${question.budget}`}
-          </span>
-          <strong>
-            {mostChoiceId ? "Who is least like you?" : "Who is most like you?"}
-          </strong>
-        </div>
+          <div>
+            <span className="ordering-label">
+              {question.continuing
+                ? `TARGETED QUESTION ${question.question}`
+                : `QUESTION ${question.question}`}
+            </span>
+            <strong>
+              {mostChoiceId ? "Pick the option least like your choice." : "Pick the option closest to what you would choose."}
+            </strong>
+          </div>
         <div className="ordering-progress">
           <span
             style={{
               width: question.continuing
                 ? "100%"
-                : `${((question.question - 1) / question.budget) * 100}%`,
+                : `${((question.question - 1) / Math.max(question.budget, question.question + 1)) * 100}%`,
             }}
           />
         </div>
         <span className="mono muted">
-          {question.continuing ? "until stable" : "most + least"}
-        </span>
+            {question.continuing ? "until stable" : "one choice, then one contrast"}
+          </span>
       </div>
       {awaitingHostedScenario ? (
         <section className="scenario-band scenario-pending" aria-busy="true" aria-live="polite">
@@ -1992,15 +1974,15 @@ function RapidCompare({
             <span className="scenario-label">STEP {mostChoice ? "2" : "1"} OF 2</span>
             <strong>
               {mostChoice
-                ? `Person ${mostChoice.id} is most like you. Now choose the person least like you.`
-                : "Choose the person whose decision is most like what you would do."}
+                ? `Person ${mostChoice.id} is closest to your choice. Now pick the least similar one.`
+                : "Pick the person whose decision is closest to what you would choose."}
             </strong>
           </div>
           <div className="scenario-choice-list">
             {visibleScenarioChoices.map((choice, index) => (
-              <button
-                aria-label={`${mostChoice ? "Least like me" : "Most like me"}: Person ${choice.id}. ${choice.text}`}
-                className="scenario-choice"
+                <button
+                  aria-label={`${mostChoice ? "Least similar choice" : "Closest choice"}: Person ${choice.id}. ${choice.text}`}
+                  className="scenario-choice"
                 disabled={choosing}
                 key={`${choice.id}:${index}`}
                 onClick={() => void chooseScenario(choice)}
@@ -2018,7 +2000,7 @@ function RapidCompare({
           <div className="scenario-action-footer">
             {mostChoiceId && (
               <button className="btn btn-sm" type="button" onClick={() => setMostChoiceId("")}>
-                Change most-like choice
+                Change first choice
               </button>
             )}
             <button className="btn btn-sm" type="button" onClick={() => void generateScenario(false)}>

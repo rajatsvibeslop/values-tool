@@ -9,8 +9,6 @@ import { detectTensions, type TensionSuggestion } from "@/domain/tensions";
 import type { Rating, RatingEvent } from "@/domain/types";
 import {
   adjacentDecisions,
-  portraitQuestionBudget,
-  rapidQuestionBudget,
   selectRapidGroup,
 } from "@/domain/rapid-ranking";
 import { deriveScenario, type GeneratedScenario } from "@/domain/scenarios";
@@ -105,7 +103,6 @@ export interface SessionRow {
 
 export interface QuizSessionConfig {
   domainId: string;
-  contextPreset: string;
   contextText: string;
   choiceCount: number;
 }
@@ -240,7 +237,6 @@ export class BrowserRepository {
     if (!stored) return null;
     return {
       domainId: String(stored.domainId ?? "general-life"),
-      contextPreset: String(stored.contextPreset ?? ""),
       contextText: String(stored.contextText ?? ""),
       choiceCount: Math.min(7, Math.max(2, Number(stored.choiceCount ?? 5))),
     };
@@ -1144,22 +1140,18 @@ export class BrowserRepository {
     avoidValueIds: string[] = [],
   ): RapidQuestion | null {
     const values = this.values(session.value_set_id);
-    const portraitMode = this.sessionMode(session.id) === "portrait";
     const quizConfig = this.quizSessionConfig(session.id);
     const choiceCount = Math.min(
       Math.max(2, quizConfig?.choiceCount ?? this.settings().quiz.defaultChoiceCount ?? 5),
       7,
     );
-    const minimumBudget = portraitMode
-      ? portraitQuestionBudget(values.length)
-      : rapidQuestionBudget(values.length, choiceCount);
     const diagnostics = this.sessionConvergence(session.id);
-    const targetReached =
-      diagnostics.insufficientValues === 0 &&
-      !["more-needed", "contexts-unresolved"].includes(diagnostics.state);
-    const continuing = completedQuestions >= minimumBudget && !targetReached;
-    const questionBudget = continuing ? completedQuestions + 1 : minimumBudget;
     const settings = this.settings();
+    const shouldStop = settings.convergence.tiersSufficient
+      ? ["top-stable", "tiers-stable", "exact-stable"].includes(diagnostics.state)
+      : diagnostics.state === "exact-stable";
+    const reachedMinimum = completedQuestions >= settings.convergence.minimumComparisons;
+    if (reachedMinimum && shouldStop) return null;
     const ratings = this.ratings(session.value_set_id);
     const contexts = this.sessionContexts(session.id);
     const relevantEvents = effectiveEvents(this.events(session.value_set_id)).filter(
@@ -1186,7 +1178,7 @@ export class BrowserRepository {
       events: relevantEvents,
       seed: `${session.value_set_id}:${this.exactScope(session.id)}`,
       completedQuestions,
-      questionBudget,
+      questionBudget: completedQuestions + 1,
       groupSize: choiceCount,
       avoidValueIds,
     });
@@ -1197,13 +1189,15 @@ export class BrowserRepository {
       .map((context) => context.name);
     return {
       ...group,
-      budget: minimumBudget,
-      continuing,
-      reason: continuing
-        ? diagnostics.insufficientValues > 0
+      budget: Math.max(completedQuestions + 1, settings.convergence.minimumComparisons),
+      continuing: !shouldStop,
+      reason: shouldStop
+        ? settings.convergence.tiersSufficient
+          ? "Confirm the current tiers"
+          : "Resolve remaining ordering uncertainty"
+        : diagnostics.insufficientValues > 0
           ? `Close ${diagnostics.insufficientValues} evidence gap${diagnostics.insufficientValues === 1 ? "" : "s"}`
-          : "Resolve remaining ranking uncertainty"
-        : group.reason,
+          : "Resolve remaining ranking uncertainty",
       sessionId: session.id,
       scenario: deriveScenario({
         values: groupValues.map((value) => ({
@@ -1223,16 +1217,6 @@ export class BrowserRepository {
   }
 
   private async regenerateRapidQueue(session: SessionRow): Promise<void> {
-    const values = this.values(session.value_set_id);
-    const portraitMode = this.sessionMode(session.id) === "portrait";
-    const quizConfig = this.quizSessionConfig(session.id);
-    const choiceCount = Math.min(
-      Math.max(2, quizConfig?.choiceCount ?? this.settings().quiz.defaultChoiceCount ?? 5),
-      7,
-    );
-    const questionBudget = portraitMode
-      ? portraitQuestionBudget(values.length)
-      : rapidQuestionBudget(values.length, choiceCount);
     const prepared = this.preparedRapidQuestions(session.id);
     const promoted = prepared.find(
       (question) => question.question === session.completed_count + 1,
@@ -1258,7 +1242,7 @@ export class BrowserRepository {
           "INSERT INTO application_settings(key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value,updated_at=excluded.updated_at",
           [
             `rapid-ranking:${session.value_set_id}:${scope}`,
-            json({ complete: true, questions: session.completed_count, budget: questionBudget, sessionId: session.id }),
+            json({ complete: true, questions: session.completed_count, budget: session.completed_count, sessionId: session.id }),
             stamp,
           ],
         );
@@ -1310,11 +1294,10 @@ export class BrowserRepository {
 
   private quizContextText(sessionId: string, config: QuizSessionConfig | null): string {
     const contextText = config?.contextText.trim() ?? "";
-    const contextPreset = config?.contextPreset.trim() ?? "";
     const contextNames = this.contexts()
       .filter((context) => this.sessionContexts(sessionId).includes(context.id))
       .map((context) => context.name);
-    return [contextPreset, contextText, ...contextNames]
+    return [contextText, ...contextNames]
       .map((item) => item.trim())
       .filter(Boolean)
       .join(". ");
