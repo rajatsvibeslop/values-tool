@@ -15,8 +15,10 @@ import {
 } from "@/domain/rapid-ranking";
 import { deriveScenario, type GeneratedScenario } from "@/domain/scenarios";
 import { convergenceDiagnostics, type ConvergenceDiagnostics } from "@/domain/convergence";
+import { valueSetImportSchema } from "@/domain/import";
 import { DEFAULT_SETTINGS } from "@/db/defaults";
 import type { BrowserDatabase } from "./database";
+import { z } from "zod";
 import schwartz10 from "../../data/presets/schwartz-10.json";
 import schwartz19 from "../../data/presets/schwartz-19.json";
 import rokeachTerminal from "../../data/presets/rokeach-terminal.json";
@@ -563,6 +565,108 @@ export class BrowserRepository {
     });
     await this.recompute(setId);
     return setId;
+  }
+
+  exportValueSet(valueSetId: string): z.infer<typeof valueSetImportSchema> {
+    const set = this.db.one<SetRow>(
+      "SELECT * FROM value_sets WHERE id=?",
+      [valueSetId],
+    );
+    if (!set) throw new Error("Value set not found");
+    const values = this.values(valueSetId, true).map((value) => ({
+      name: value.name,
+      shortDefinition: value.short_definition,
+      sourceDefinition: value.source_definition,
+      personalDefinition: value.personal_definition,
+      sourceTaxonomy: value.source_taxonomy,
+      sourceIdentifier: value.source_identifier,
+      parentCategory: value.parent_category,
+      aliases: value.aliases ?? [],
+      tags: parsed<string[]>(value.tags, []),
+    }));
+    return valueSetImportSchema.parse({
+      format: "values-tool-value-set",
+      version: 1,
+      name: set.name,
+      description: set.description,
+      source: parsed<Record<string, unknown>>(set.source_metadata, {}),
+      values,
+    });
+  }
+
+  async replaceValueSet(valueSetId: string, input: unknown): Promise<void> {
+    const parsedInput = valueSetImportSchema.parse(input);
+    const current = this.db.one<SetRow>("SELECT * FROM value_sets WHERE id=?", [valueSetId]);
+    if (!current) throw new Error("Value set not found");
+    const stamp = now();
+    const oldValues = this.values(valueSetId, true);
+    const oldValueIds = oldValues.map((value) => value.id);
+    await this.resetEvidence(valueSetId);
+    await this.db.transaction(() => {
+      if (oldValueIds.length) {
+        const placeholders = oldValueIds.map(() => "?").join(",");
+        this.db.run(`DELETE FROM value_aliases WHERE value_id IN (${placeholders})`, oldValueIds);
+        this.db.run(`DELETE FROM definition_revisions WHERE value_id IN (${placeholders})`, oldValueIds);
+        this.db.run(`DELETE FROM value_set_memberships WHERE value_set_id=?`, [valueSetId]);
+        this.db.run(`DELETE FROM "values" WHERE id IN (${placeholders})`, oldValueIds);
+      }
+      this.db.run(
+        "UPDATE value_sets SET name=?,description=?,source_type=?,source_metadata=?,archived=0,updated_at=? WHERE id=?",
+        [
+          parsedInput.name,
+          parsedInput.description,
+          "custom",
+          json({ importedFrom: "json", source: parsedInput.source ?? {} }),
+          stamp,
+          valueSetId,
+        ],
+      );
+      parsedInput.values.forEach((item, index) => {
+        const valueId = uid();
+        this.db.run('INSERT INTO "values" VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', [
+          valueId,
+          item.name,
+          item.shortDefinition ?? "",
+          item.sourceDefinition ?? "",
+          item.personalDefinition ?? "",
+          item.sourceTaxonomy ?? "",
+          item.sourceIdentifier ?? "",
+          item.parentCategory ?? "",
+          json(item.tags ?? []),
+          1,
+          stamp,
+          stamp,
+        ]);
+        this.db.run("INSERT INTO value_set_memberships VALUES (?,?,?,?,?)", [
+          valueSetId,
+          valueId,
+          json({
+            importedFrom: "json",
+            sourceIdentifier: item.sourceIdentifier ?? "",
+          }),
+          index,
+          stamp,
+        ]);
+        for (const alias of item.aliases ?? [])
+          this.db.run("INSERT INTO value_aliases VALUES (?,?,?,?,?)", [
+            uid(),
+            valueId,
+            alias,
+            "user",
+            stamp,
+          ]);
+        this.db.run("INSERT INTO definition_revisions VALUES (?,?,?,?,?,?,?)", [
+          uid(),
+          valueId,
+          item.shortDefinition ?? "",
+          item.sourceDefinition ?? "",
+          item.personalDefinition ?? "",
+          "Imported from JSON",
+          stamp,
+        ]);
+      });
+    });
+    await this.recompute(valueSetId);
   }
 
   async createSet(name: string, description = ""): Promise<string> {

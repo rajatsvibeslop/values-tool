@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Database,
   Download,
+  FileJson,
   FileText,
   History,
   GripVertical,
@@ -796,6 +797,66 @@ function ValuesView({ repo, db, mutate }: ViewProps) {
                 Definitions, revisions, comparison notes, wins, losses,
                 reversals, claims, and provenance appear here.
               </Empty>
+            </Panel>
+          )}
+          {set && (
+            <Panel title="JSON round-trip">
+              <div className="stack">
+                <button
+                  className="btn btn-primary"
+                  onClick={() =>
+                    download(
+                      `${set.name}.json`,
+                      JSON.stringify(repo.exportValueSet(set.id), null, 2),
+                      "application/json",
+                    )
+                  }
+                >
+                  <FileJson size={14} /> Export current set JSON
+                </button>
+                <form
+                  className="stack"
+                  onSubmit={(event) => {
+                    const data = submit(event);
+                    const file = data.get("file");
+                    mutate(async () => {
+                      const raw =
+                        file instanceof File && file.size
+                          ? await file.text()
+                          : String(data.get("data") ?? "").trim();
+                      if (!raw)
+                        throw new Error("Choose a JSON file or paste JSON");
+                      await repo.replaceValueSet(set.id, JSON.parse(raw));
+                    });
+                    event.currentTarget.reset();
+                  }}
+                >
+                  <div className="notice notice-warning small">
+                    Replaces this set with imported JSON. Existing evidence for
+                    this set is cleared before the new values are written.
+                  </div>
+                  <Field label="JSON file">
+                    <input
+                      className="input"
+                      type="file"
+                      name="file"
+                      accept="application/json,.json"
+                    />
+                  </Field>
+                  <details>
+                    <summary>Or paste JSON</summary>
+                    <textarea
+                      className="textarea"
+                      name="data"
+                      style={{ minHeight: 180, marginTop: 10 }}
+                      placeholder='{"format":"values-tool-value-set","version":1,"name":"My values","values":[{"name":"Care","shortDefinition":"Supporting flourishing"}]}'
+                    />
+                  </details>
+                  <button className="btn btn-danger" type="submit">
+                    <Upload size={14} /> Replace from JSON
+                  </button>
+                </form>
+              </div>
             </Panel>
           )}
           <Panel title="Import built-in preset">

@@ -38,6 +38,38 @@ describe("browser repository integration", () => {
     expect(repo.values(setId).find((value) => value.name === "Freedom")?.parent_category).toBe("Freedom");
   });
 
+  it("exports and replaces a value set from JSON", async () => {
+    const setId = await repo.importPreset("editable-card-sort");
+    const sessionId = await repo.startSession(setId, "Round trip", []);
+    const pair = repo.queue(sessionId)[0]!;
+    await repo.submit({
+      sessionId,
+      setId,
+      leftId: pair.left_value_id,
+      rightId: pair.right_value_id,
+      result: "left",
+      strength: "moderate",
+      confidence: "confident",
+      contexts: [],
+      reasoning: "",
+      winner: "",
+      loser: "",
+      reversal: "",
+    });
+    const exported = repo.exportValueSet(setId);
+    exported.name = "Edited card sort";
+    exported.description = "Edited offline and reimported";
+    exported.values = exported.values.slice(0, 3).map((value, index) => ({
+      ...value,
+      name: `Edited ${index + 1}`,
+    }));
+    await repo.replaceValueSet(setId, exported);
+    expect(repo.values(setId)).toHaveLength(3);
+    expect(repo.sets().find((set) => set.id === setId)?.name).toBe("Edited card sort");
+    expect(repo.history(setId)).toHaveLength(0);
+    expect(repo.sessions().some((session) => session.value_set_id === setId)).toBe(false);
+  });
+
   it("finishes an exact-order session instead of replenishing the queue", async () => {
     const setId = await repo.createSet("Small order");
     for (const name of ["Alpha", "Beta", "Gamma", "Delta"])
