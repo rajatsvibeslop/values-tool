@@ -1966,7 +1966,7 @@ function RapidCompare({
       )}
       {awaitingHostedScenario ? (
         <div className="scenario-loading muted" aria-busy="true">
-          <RefreshCw className="spin" size={20} /> Preparing people and choices…
+          <RefreshCw className="spin" size={20} /> Preparing scenario and choices…
         </div>
       ) : hostedScenarioFailed ? null : useScenarioChoices ? (
         <section className="scenario-actions" aria-label="Possible actions">
@@ -1974,14 +1974,14 @@ function RapidCompare({
             <span className="scenario-label">STEP {mostChoice ? "2" : "1"} OF 2</span>
             <strong>
               {mostChoice
-                ? `Person ${mostChoice.id} is closest to your choice. Now pick the least similar one.`
-                : "Pick the person whose decision is closest to what you would choose."}
+                ? `Option ${mostChoice.id} is closest to your choice. Now pick the least similar one.`
+                : "Pick the option whose decision is closest to what you would choose."}
             </strong>
           </div>
           <div className="scenario-choice-list">
             {visibleScenarioChoices.map((choice, index) => (
                 <button
-                  aria-label={`${mostChoice ? "Least similar choice" : "Closest choice"}: Person ${choice.id}. ${choice.text}`}
+                  aria-label={`${mostChoice ? "Least similar choice" : "Closest choice"}: Option ${choice.id}. ${choice.text}`}
                   className="scenario-choice"
                 disabled={choosing}
                 key={`${choice.id}:${index}`}
@@ -1990,7 +1990,7 @@ function RapidCompare({
               >
                 <span className="scenario-choice-key">{choice.id}</span>
                 <span className="scenario-choice-copy">
-                  <strong>Person {choice.id}</strong>
+                  <strong>Option {choice.id}</strong>
                   <span>{choice.text}</span>
                 </span>
                 <ChevronRight size={17} aria-hidden="true" />

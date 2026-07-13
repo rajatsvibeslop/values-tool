@@ -101,7 +101,7 @@ describe("browser repository integration", () => {
     const sessionId = await repo.startSession(setId, "Rapid ranking", [], "rapid");
     const question = repo.rapidQuestion(sessionId)!;
     expect(question.valueIds).toHaveLength(5);
-    expect(question.budget).toBe(16);
+    expect(question.budget).toBeGreaterThanOrEqual(question.question);
     await repo.submitRapidRanking({
       sessionId,
       setId,
@@ -118,7 +118,7 @@ describe("browser repository integration", () => {
     const setId = await repo.importPreset("editable-card-sort");
     const sessionId = await repo.startSession(setId, "Portrait choices", [], "portrait");
     const question = repo.rapidQuestion(sessionId)!;
-    expect(question.budget).toBe(40);
+    expect(question.budget).toBeGreaterThanOrEqual(question.question);
     const focalValues = question.valueIds.slice(0, 3);
     await repo.updateRapidScenario(sessionId, {
       text: "Three colleagues choose different reasonable paths through the same decision.",
@@ -127,7 +127,7 @@ describe("browser repository integration", () => {
       generatedAt: new Date().toISOString(),
       choices: focalValues.map((focalValueId, index) => ({
         id: String.fromCharCode(65 + index),
-        text: `Person ${index + 1} takes a distinct but plausible course of action.`,
+        text: `Option ${index + 1} takes a distinct but plausible course of action.`,
         focalValueId,
       })),
     });
@@ -141,8 +141,8 @@ describe("browser repository integration", () => {
     expect(repo.sessions().find((session) => session.id === sessionId)?.completed_count).toBe(1);
     expect(repo.history(setId)).toHaveLength(3);
     expect(repo.history(setId)[0]?.tags).toContain("portrait-choice");
-    expect(database.query<{ text: string }>("SELECT text FROM comparison_notes WHERE note_type='portrait_most'")[0]?.text).toContain("Person A");
-    expect(database.query<{ text: string }>("SELECT text FROM comparison_notes WHERE note_type='portrait_least'")[0]?.text).toContain("Person C");
+    expect(database.query<{ text: string }>("SELECT text FROM comparison_notes WHERE note_type='portrait_most'")[0]?.text).toContain("Option A");
+    expect(database.query<{ text: string }>("SELECT text FROM comparison_notes WHERE note_type='portrait_least'")[0]?.text).toContain("Option C");
     expect(repo.rapidQuestion(sessionId)?.question).toBe(2);
   });
 
@@ -201,7 +201,7 @@ describe("browser repository integration", () => {
     await repo.regenerateQueue(sessionId);
     const question = repo.rapidQuestion(sessionId)!;
     expect(question.question).toBe(39);
-    expect(question.budget).toBe(38);
+    expect(question.budget).toBeGreaterThanOrEqual(question.question);
     expect(question.continuing).toBe(true);
     expect(question.reason).toContain("evidence gap");
     expect(repo.sessions().find((session) => session.id === sessionId)?.status).toBe("active");

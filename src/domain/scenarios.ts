@@ -82,7 +82,7 @@ export function deriveScenario(input: ScenarioRequest): GeneratedScenario {
     ? input.profiles
     : buildScenarioProfiles(input.values, `${input.purpose}:${input.question}`, input.choiceCount);
   return {
-    text: `${input.domain ? `${input.domain}: ` : ""}In ${context}, several people face the same consequential decision. Each protects something important while accepting a different cost.`,
+    text: `${input.domain ? `${input.domain}: ` : ""}In ${context}, several options respond to the same consequential decision. Each protects something important while accepting a different cost.`,
     provider: "local",
     model: "definition-derived",
     generatedAt: new Date().toISOString(),
@@ -107,6 +107,7 @@ function scenarioPrompt(input: ScenarioRequest & { profiles: ScenarioProfile[] }
 
 Requirements:
 - Make all supplied values genuinely relevant and in tension.
+- The scenario must be built around the supplied values so the choices make their differences salient.
 - Do not name the values or reveal a preferred answer.
 - Use the supplied definitions, not stereotypes about the labels.
 - Use the domain, freeform context, and session purpose when supplied.
@@ -120,9 +121,9 @@ Requirements:
 - Keep the outcome stakes constant across people; vary only which concern guides their response.
 - Write the scenario in 2 concise sentences, under 70 words total.
 - Write ${actionCount} distinct, concrete actions labeled A through ${finalLabel}, each under 24 words.
-- Each action belongs to an anonymous person and must primarily express its assigned focal value.
-- Match feasibility, competence, kindness, risk, and social desirability across the actions as closely as possible.
-- Vary the value tradeoff, not demographic details, writing style, or how admirable the person sounds.
+- Each action belongs to an anonymous option and must primarily express its assigned focal value.
+- Match feasibility, competence, kindness, risk, and social desirability across the options as closely as possible.
+- Vary the value tradeoff, not demographic details, writing style, or how admirable the option sounds.
 - The action text must not reveal value names, value indices, or a preferred answer.
 - Return only JSON in this shape:
   {"scenario":"...","anchor":"the exact shared decision","choices":[{"id":"A","action":"..."}]}.
@@ -136,7 +137,7 @@ ${input.values.map((value, index) => `${index}. ${value.name}: ${value.definitio
 Hidden portrait assignments:
 ${input.profiles.map((profile) => {
   const value = input.values.find((item) => (item.id ?? item.name) === profile.focalValueId)!;
-  return `- Person ${profile.id}: primarily express ${value.name} -- ${value.definition}`;
+  return `- Option ${profile.id}: primarily express ${value.name} -- ${value.definition}`;
 }).join("\n")}`;
 }
 

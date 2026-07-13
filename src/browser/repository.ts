@@ -1461,17 +1461,17 @@ export class BrowserRepository {
         if (index === 0) {
           this.db.run("INSERT INTO comparison_notes VALUES (?,?,?,?,?)", [
             uid(), eventId, "general",
-            `Portrait scenario [${question.scenario.provider}/${question.scenario.model}]: ${question.scenario.text}\n${choices.map((choice) => `Person ${choice.id}: ${choice.text}`).join("\n")}`,
+            `Portrait scenario [${question.scenario.provider}/${question.scenario.model}]: ${question.scenario.text}\n${choices.map((choice) => `Option ${choice.id}: ${choice.text}`).join("\n")}`,
             stamp,
           ]);
           this.db.run("INSERT INTO comparison_notes VALUES (?,?,?,?,?)", [
             uid(), eventId, "portrait_most",
-            `Most like me -- Person ${most.id}: ${most.text}`,
+            `Closest choice -- Option ${most.id}: ${most.text}`,
             stamp,
           ]);
           this.db.run("INSERT INTO comparison_notes VALUES (?,?,?,?,?)", [
             uid(), eventId, "portrait_least",
-            `Least like me -- Person ${least.id}: ${least.text}`,
+            `Least similar choice -- Option ${least.id}: ${least.text}`,
             stamp,
           ]);
         }

@@ -89,6 +89,39 @@ describe("analysis diagnostics", () => {
     expect(result.state).toBe("more-needed");
   });
 
+  it("allows broad tiers to settle before every tail value reaches full coverage", () => {
+    const values = Array.from({ length: 20 }, (_, index) => ({
+      id: `v${index}`,
+      name: `Value ${index}`,
+      parentCategory: index < 8 ? "top" : "tail",
+      aliases: [],
+      rating: {
+        ...initialRating(config),
+        mu: 50 - index * 1.4,
+        sigma: index < 8 ? 1.1 : 5.5,
+        comparisons: index < 8 ? 8 : 1,
+      },
+    }));
+    const result = convergenceDiagnostics({
+      values,
+      recentRankings: [
+        values.map((value) => value.id),
+        values.map((value) => value.id),
+        values.map((value) => value.id),
+      ],
+      config: {
+        topK: 5,
+        minimumComparisons: 5,
+        stabilityWindow: 3,
+        uncertaintyThreshold: 3,
+        tiersSufficient: true,
+      },
+      suspectedContradictions: 0,
+    });
+    expect(result.insufficientValues).toBeGreaterThan(0);
+    expect(["top-stable", "tiers-stable"]).toContain(result.state);
+  });
+
   it("detects preference cycles", () => {
     const events = [
       event({ id: "ab", leftValueId: "a", rightValueId: "b", result: "left" }),

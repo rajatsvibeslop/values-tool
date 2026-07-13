@@ -20,6 +20,7 @@ export function convergenceDiagnostics(input: {
   const averageUncertainty = values.reduce((sum, value) => sum + value.rating.sigma, 0) / values.length;
   const maximumUncertainty = Math.max(...values.map((value) => value.rating.sigma));
   const insufficientValues = values.filter((value) => value.rating.comparisons < config.minimumComparisons).length;
+  const focusBand = ordered.slice(0, Math.max(config.topK * 2, config.topK + 1));
   const adjacent = ordered.slice(0, -1).map((value, i) => {
     const next = ordered[i + 1]!;
     return normalCdf((value.rating.mu - next.rating.mu) / Math.sqrt(value.rating.sigma ** 2 + next.rating.sigma ** 2));
@@ -36,16 +37,18 @@ export function convergenceDiagnostics(input: {
   for (const value of values) if (value.parentCategory) categories.set(value.parentCategory, (categories.get(value.parentCategory) ?? 0) + value.rating.comparisons);
   const categoryCoverage = categories.size ? [...categories.values()].filter((count) => count >= config.minimumComparisons).length / categories.size : 1;
   const contextInstability = input.contextInstability ?? 0;
+  const focusSparse = focusBand.filter((value) => value.rating.comparisons < config.minimumComparisons).length;
+  const focusCoverage = focusBand.length ? 1 - focusSparse / focusBand.length : 1;
   let state: ConvergenceDiagnostics["state"] = "more-needed";
   if (contextInstability > 0.35) state = "contexts-unresolved";
-  else if (insufficientValues === 0 && averageUncertainty <= config.uncertaintyThreshold && rankCorrelation >= 0.95 && minimumAdjacentOrderProbability >= 0.8) state = "exact-stable";
-  else if (insufficientValues === 0 && topKStability >= 0.9 && recent.length >= Math.min(2, config.stabilityWindow)) {
+  else if (averageUncertainty <= config.uncertaintyThreshold && rankCorrelation >= 0.95 && minimumAdjacentOrderProbability >= 0.8 && insufficientValues <= Math.max(config.topK, Math.ceil(values.length * 0.1))) state = "exact-stable";
+  else if (focusCoverage >= 0.8 && topKStability >= 0.9 && recent.length >= Math.min(2, config.stabilityWindow)) {
     if (unresolvedNearTies === 0) state = "top-stable";
     else if (config.tiersSufficient) state = "tiers-stable";
   }
   const explanation = state === "exact-stable" ? "The exact ordering is stable across recent snapshots and adjacent values are well separated."
     : state === "top-stable" ? `The top ${config.topK} membership is stable, but ordering within or below it remains uncertain.`
-      : state === "tiers-stable" ? `Broad tiers are stable, while ${unresolvedNearTies} adjacent pair${unresolvedNearTies === 1 ? "" : "s"} still overlap.`
+      : state === "tiers-stable" ? `Broad tiers are stable. Some lower-ranked values still have sparse coverage, but they are below the active boundary.`
         : state === "contexts-unresolved" ? "Global evidence is settling, but one or more contexts still produce materially different rankings."
           : `${insufficientValues} value${insufficientValues === 1 ? " has" : "s have"} insufficient coverage; more targeted comparisons are needed.`;
   return { averageUncertainty, maximumUncertainty, topKStability, rankCorrelation, minimumAdjacentOrderProbability, insufficientValues, unresolvedNearTies, suspectedContradictions: input.suspectedContradictions, retestConsistency, categoryCoverage, contextInstability, state, explanation };
