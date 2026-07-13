@@ -31,6 +31,13 @@ describe("browser repository integration", () => {
     await database.transaction(() => database.run("UPDATE comparison_sessions SET status='paused' WHERE id=?", [sessionId])); expect(repo.sessions()[0]!.status).toBe("paused"); await database.transaction(() => database.run("UPDATE comparison_sessions SET status='active' WHERE id=?", [sessionId])); expect(repo.sessions()[0]!.status).toBe("active");
   });
 
+  it("imports the Scott Jeffrey core values preset", async () => {
+    const setId = await repo.importPreset("scott-jeffrey-core-values");
+    expect(repo.values(setId)).toHaveLength(271);
+    expect(repo.values(setId).find((value) => value.name === "Honesty")?.parent_category).toBe("Integrity");
+    expect(repo.values(setId).find((value) => value.name === "Freedom")?.parent_category).toBe("Freedom");
+  });
+
   it("finishes an exact-order session instead of replenishing the queue", async () => {
     const setId = await repo.createSet("Small order");
     for (const name of ["Alpha", "Beta", "Gamma", "Delta"])

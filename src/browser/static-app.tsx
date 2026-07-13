@@ -3572,7 +3572,7 @@ function Reports({ repo, db }: ViewProps) {
     claims,
     repo.settings(),
   );
-  const html = reportHtml(set, rows, tiers, history, tensions, claims);
+  const html = reportHtml(set, rows, tiers);
   return (
     <Page
       title="Reports"
@@ -3636,53 +3636,6 @@ function Reports({ repo, db }: ViewProps) {
         <IntervalPlot rows={rows} />
         <h2>Definitely above or below</h2>
         <IntervalMatrix rows={rows} tiers={tiers} />
-        <h2>Method</h2>
-        <p>
-          Ratings are replayed from recorded comparisons. Tiers join neighbors
-          whose pairwise ordering is below 90% confidence. Incomparable, skipped,
-          and unclear choices are not treated as draws. Confidence modifiers are{" "}
-          {repo.settings().rating.modifiersEnabled
-            ? "enabled with bounded observation-noise adjustments"
-            : "recorded but disabled for rating updates"}
-          .
-        </p>
-        <h2>Contexts</h2>
-        {repo.contexts().map((context) => (
-          <p key={context.id}>
-            <strong>{context.name}:</strong>{" "}
-            {repo
-              .ratings(set.id, `context:${context.id}`)
-              .slice(0, 3)
-              .map((row) => row.name)
-              .join(", ") || "unresolved"}
-          </p>
-        ))}
-        <h2>Claims</h2>
-        {claims.map((claim) => (
-          <p key={claim.id}>
-            <span className="badge">
-              {claim.creation_method} · {claim.status}
-            </span>{" "}
-            {claim.text} <span className="mono">[{claim.id.slice(0, 8)}]</span>
-          </p>
-        ))}
-        <h2>Tensions</h2>
-        {tensions.map((tension) => (
-          <p key={tension.id}>
-            <strong>{tension.title}</strong> ({tension.status}) —{" "}
-            {tension.description}{" "}
-            <span className="mono">[{tension.id.slice(0, 8)}]</span>
-          </p>
-        ))}
-        <h2>Comparison appendix</h2>
-        {history.map((event) => (
-          <p className="small" key={event.id}>
-            <span className="mono">[{event.id.slice(0, 8)}]</span>{" "}
-            {new Date(event.occurred_at).toLocaleDateString()} ·{" "}
-            {event.left_name} vs {event.right_name} · {event.result} ·{" "}
-            {(event.notes ?? []).map((note) => note.text).join(" | ")}
-          </p>
-        ))}
       </article>
     </Page>
   );
@@ -3700,9 +3653,6 @@ function reportHtml(
   set: SetRow,
   rows: RatingRow[],
   tiers: RatingRow[][],
-  history: EventRow[],
-  tensions: { id: string; title: string; description: string; status: string }[],
-  claims: { id: string; text: string; creation_method: string; status: string }[],
 ) {
   const z = 1.645;
   const domain = intervalDomain(rows, z);
@@ -3734,8 +3684,8 @@ function reportHtml(
     )
     .join("")}</tbody></table>`;
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>${escapeHtml(set.name)} · values report</title><style>
-  :root{--ink:#111315;--muted:#657079;--rule:#d9dee2;--blue:#2455ff;--green:#14805e;--amber:#d99000;--red:#cb4b41}*{box-sizing:border-box}body{margin:0;color:var(--ink);font:14px/1.4 Arial,sans-serif}main{max-width:1200px;margin:auto;padding:48px}header{border-top:8px solid var(--ink);padding:24px 0 34px}h1{font-size:42px;margin:0}h2{font-size:18px;margin:44px 0 14px;border-bottom:2px solid var(--ink);padding-bottom:8px}code,small{font-family:ui-monospace,monospace;color:var(--muted)}.tier{display:grid;grid-template-columns:54px 1fr;border-top:1px solid var(--rule)}.tier>b{font-size:24px;padding:14px}.tier>div{display:flex;flex-wrap:wrap;gap:8px;padding:12px}.tier span{border:1px solid var(--rule);padding:6px 8px}.tier small{margin-left:6px}.interval{display:grid;grid-template-columns:28px 170px 1fr 86px;gap:10px;align-items:center;min-height:30px}.interval i{height:12px;position:relative;background:#f0f2f4}.interval u{position:absolute;top:3px;height:6px;background:#aab8ff;text-decoration:none}.interval em{position:absolute;top:0;width:2px;height:12px;background:var(--blue)}.legend{display:flex;gap:16px;margin:8px 0}.legend i{width:12px;height:12px;display:inline-block;margin-right:4px}.matrix{border-collapse:collapse;font-size:9px}.matrix th{height:13px;min-width:11px;font-weight:400}.matrix tbody th{text-align:right;padding-right:7px;white-space:nowrap;max-width:150px;overflow:hidden}.matrix td{width:11px;height:11px;border:1px solid white}.matrix .above,.legend .above{background:var(--green)}.matrix .below,.legend .below{background:#cbd2d7}.matrix .overlap,.legend .overlap{background:var(--amber)}.matrix .same{background:var(--ink)}.matrix tr.break td,.matrix tr.break th{border-top:2px solid var(--ink)}.records p{margin:5px 0}@media print{@page{size:landscape;margin:10mm}main{padding:0}.matrix{font-size:7px}.matrix td{width:8px;height:8px}}
-  </style></head><body><main><header><small>VALUES PROFILE · ${new Date().toISOString()}</small><h1>${escapeHtml(set.name)}</h1></header><h2>Stable tiers</h2>${tierMarkup}<h2>90% credible intervals</h2>${intervalMarkup}<h2>Definitely above or below</h2><div class="legend"><span><i class="above"></i>above</span><span><i class="overlap"></i>unresolved</span><span><i class="below"></i>below</span></div>${matrixMarkup}<h2>Claims</h2>${claims.map((claim) => `<p><small>${escapeHtml(claim.creation_method)} · ${escapeHtml(claim.status)} · ${escapeHtml(claim.id.slice(0, 8))}</small><br>${escapeHtml(claim.text)}</p>`).join("") || "<p>None recorded.</p>"}<h2>Tensions</h2>${tensions.map((tension) => `<p><strong>${escapeHtml(tension.title)}</strong> · ${escapeHtml(tension.description)} <small>${escapeHtml(tension.id.slice(0, 8))}</small></p>`).join("") || "<p>None recorded.</p>"}<h2>Comparison appendix</h2><div class="records">${history.map((event) => `<p><small>${escapeHtml(event.id.slice(0, 8))}</small> ${escapeHtml(event.left_name)} / ${escapeHtml(event.right_name)} · ${escapeHtml(event.result)}</p>`).join("")}</div></main></body></html>`;
+  :root{--ink:#111315;--muted:#657079;--rule:#d9dee2;--blue:#2455ff;--green:#14805e;--amber:#d99000;--red:#cb4b41}*{box-sizing:border-box}body{margin:0;color:var(--ink);font:14px/1.4 Arial,sans-serif}main{max-width:1200px;margin:auto;padding:48px}header{border-top:8px solid var(--ink);padding:24px 0 34px}h1{font-size:42px;margin:0}h2{font-size:18px;margin:44px 0 14px;border-bottom:2px solid var(--ink);padding-bottom:8px}code,small{font-family:ui-monospace,monospace;color:var(--muted)}.tier{display:grid;grid-template-columns:54px 1fr;border-top:1px solid var(--rule)}.tier>b{font-size:24px;padding:14px}.tier>div{display:flex;flex-wrap:wrap;gap:8px;padding:12px}.tier span{border:1px solid var(--rule);padding:6px 8px}.tier small{margin-left:6px}.interval{display:grid;grid-template-columns:28px 170px 1fr 86px;gap:10px;align-items:center;min-height:30px}.interval i{height:12px;position:relative;background:#f0f2f4}.interval u{position:absolute;top:3px;height:6px;background:#aab8ff;text-decoration:none}.interval em{position:absolute;top:0;width:2px;height:12px;background:var(--blue)}.legend{display:flex;gap:16px;margin:8px 0}.legend i{width:12px;height:12px;display:inline-block;margin-right:4px}.matrix{border-collapse:collapse;font-size:9px;print-color-adjust:exact;-webkit-print-color-adjust:exact}.matrix th{height:13px;min-width:11px;font-weight:400}.matrix tbody th{text-align:right;padding-right:7px;white-space:nowrap;max-width:150px;overflow:hidden}.matrix td{width:11px;height:11px;border:1px solid white;print-color-adjust:exact;-webkit-print-color-adjust:exact}.matrix .above,.legend .above{background:var(--green)}.matrix .below,.legend .below{background:#cbd2d7}.matrix .overlap,.legend .overlap{background:var(--amber)}.matrix .same{background:var(--ink)}.matrix tr.break td,.matrix tr.break th{border-top:2px solid var(--ink)}@media print{@page{size:landscape;margin:10mm}main{padding:0}.matrix{font-size:7px}.matrix td{width:8px;height:8px}}
+  </style></head><body><main><header><small>VALUES PROFILE · ${new Date().toISOString()}</small><h1>${escapeHtml(set.name)}</h1></header><h2>Stable tiers</h2>${tierMarkup}<h2>90% credible intervals</h2>${intervalMarkup}<h2>Definitely above or below</h2><div class="legend"><span><i class="above"></i>above</span><span><i class="overlap"></i>unresolved</span><span><i class="below"></i>below</span></div>${matrixMarkup}</main></body></html>`;
 }
 function reportMarkdown(
   set: SetRow,

@@ -1,0 +1,1637 @@
+{
+  "slug": "scott-jeffrey-core-values",
+  "name": "Scott Jeffrey core values list",
+  "description": "A broad reference catalog of 270+ common core-value labels organized by category.",
+  "citation": "Scott Jeffrey, \"The Ultimate List of Core Values (Over 270 Examples)\" (https://scottjeffrey.com/core-values-list/).",
+  "sourceUrl": "https://scottjeffrey.com/core-values-list/",
+  "licenseNote": "Public reference list of value labels. Definitions are original, minimal paraphrases for educational personal use.",
+  "taxonomy": "Scott Jeffrey core values categories",
+  "values": [
+    {
+      "id": "accountability",
+      "name": "Accountability",
+      "definition": "Accountability",
+      "category": "Integrity"
+    },
+    {
+      "id": "candor",
+      "name": "Candor",
+      "definition": "Candor",
+      "category": "Integrity"
+    },
+    {
+      "id": "character",
+      "name": "Character",
+      "definition": "Character",
+      "category": "Integrity"
+    },
+    {
+      "id": "chastity",
+      "name": "Chastity",
+      "definition": "Chastity",
+      "category": "Integrity"
+    },
+    {
+      "id": "commitment",
+      "name": "Commitment",
+      "definition": "Commitment",
+      "category": "Integrity"
+    },
+    {
+      "id": "dependability",
+      "name": "Dependability",
+      "definition": "Dependability",
+      "category": "Integrity"
+    },
+    {
+      "id": "dignity",
+      "name": "Dignity",
+      "definition": "Dignity",
+      "category": "Integrity"
+    },
+    {
+      "id": "honesty",
+      "name": "Honesty",
+      "definition": "Honesty",
+      "category": "Integrity"
+    },
+    {
+      "id": "honor",
+      "name": "Honor",
+      "definition": "Honor",
+      "category": "Integrity"
+    },
+    {
+      "id": "modesty",
+      "name": "Modesty",
+      "definition": "Modesty",
+      "category": "Integrity"
+    },
+    {
+      "id": "responsibility",
+      "name": "Responsibility",
+      "definition": "Responsibility",
+      "category": "Integrity"
+    },
+    {
+      "id": "sincerity",
+      "name": "Sincerity",
+      "definition": "Sincerity",
+      "category": "Integrity"
+    },
+    {
+      "id": "transparency",
+      "name": "Transparency",
+      "definition": "Transparency",
+      "category": "Integrity"
+    },
+    {
+      "id": "trustworthy",
+      "name": "Trustworthy",
+      "definition": "Trustworthy",
+      "category": "Integrity"
+    },
+    {
+      "id": "truth",
+      "name": "Truth",
+      "definition": "Truth",
+      "category": "Integrity"
+    },
+    {
+      "id": "accomplishment",
+      "name": "Accomplishment",
+      "definition": "Accomplishment",
+      "category": "Achievement"
+    },
+    {
+      "id": "achievement",
+      "name": "Achievement",
+      "definition": "Achievement",
+      "category": "Achievement"
+    },
+    {
+      "id": "capable",
+      "name": "Capable",
+      "definition": "Capable",
+      "category": "Achievement"
+    },
+    {
+      "id": "challenge",
+      "name": "Challenge",
+      "definition": "Challenge",
+      "category": "Achievement"
+    },
+    {
+      "id": "credibility",
+      "name": "Credibility",
+      "definition": "Credibility",
+      "category": "Achievement"
+    },
+    {
+      "id": "determination",
+      "name": "Determination",
+      "definition": "Determination",
+      "category": "Achievement"
+    },
+    {
+      "id": "development",
+      "name": "Development",
+      "definition": "Development",
+      "category": "Achievement"
+    },
+    {
+      "id": "drive",
+      "name": "Drive",
+      "definition": "Drive",
+      "category": "Achievement"
+    },
+    {
+      "id": "effectiveness",
+      "name": "Effectiveness",
+      "definition": "Effectiveness",
+      "category": "Achievement"
+    },
+    {
+      "id": "empower",
+      "name": "Empower",
+      "definition": "Empower",
+      "category": "Achievement"
+    },
+    {
+      "id": "endurance",
+      "name": "Endurance",
+      "definition": "Endurance",
+      "category": "Achievement"
+    },
+    {
+      "id": "excellence",
+      "name": "Excellence",
+      "definition": "Excellence",
+      "category": "Achievement"
+    },
+    {
+      "id": "fame",
+      "name": "Fame",
+      "definition": "Fame",
+      "category": "Achievement"
+    },
+    {
+      "id": "greatness",
+      "name": "Greatness",
+      "definition": "Greatness",
+      "category": "Achievement"
+    },
+    {
+      "id": "growth",
+      "name": "Growth",
+      "definition": "Growth",
+      "category": "Achievement"
+    },
+    {
+      "id": "hard-work",
+      "name": "Hard work",
+      "definition": "Hard work",
+      "category": "Achievement"
+    },
+    {
+      "id": "improvement",
+      "name": "Improvement",
+      "definition": "Improvement",
+      "category": "Achievement"
+    },
+    {
+      "id": "influence",
+      "name": "Influence",
+      "definition": "Influence",
+      "category": "Achievement"
+    },
+    {
+      "id": "integrity",
+      "name": "Integrity",
+      "definition": "Integrity",
+      "category": "Achievement"
+    },
+    {
+      "id": "leadership",
+      "name": "Leadership",
+      "definition": "Leadership",
+      "category": "Achievement"
+    },
+    {
+      "id": "mastery",
+      "name": "Mastery",
+      "definition": "Mastery",
+      "category": "Achievement"
+    },
+    {
+      "id": "motivation",
+      "name": "Motivation",
+      "definition": "Motivation",
+      "category": "Achievement"
+    },
+    {
+      "id": "performance",
+      "name": "Performance",
+      "definition": "Performance",
+      "category": "Achievement"
+    },
+    {
+      "id": "potential",
+      "name": "Potential",
+      "definition": "Potential",
+      "category": "Achievement"
+    },
+    {
+      "id": "productivity",
+      "name": "Productivity",
+      "definition": "Productivity",
+      "category": "Achievement"
+    },
+    {
+      "id": "professionalism",
+      "name": "Professionalism",
+      "definition": "Professionalism",
+      "category": "Achievement"
+    },
+    {
+      "id": "prosperity",
+      "name": "Prosperity",
+      "definition": "Prosperity",
+      "category": "Achievement"
+    },
+    {
+      "id": "recognition",
+      "name": "Recognition",
+      "definition": "Recognition",
+      "category": "Achievement"
+    },
+    {
+      "id": "results-oriented",
+      "name": "Results-oriented",
+      "definition": "Results-oriented",
+      "category": "Achievement"
+    },
+    {
+      "id": "risk",
+      "name": "Risk",
+      "definition": "Risk",
+      "category": "Achievement"
+    },
+    {
+      "id": "significance",
+      "name": "Significance",
+      "definition": "Significance",
+      "category": "Achievement"
+    },
+    {
+      "id": "skill",
+      "name": "Skill",
+      "definition": "Skill",
+      "category": "Achievement"
+    },
+    {
+      "id": "skillfulness",
+      "name": "Skillfulness",
+      "definition": "Skillfulness",
+      "category": "Achievement"
+    },
+    {
+      "id": "status",
+      "name": "Status",
+      "definition": "Status",
+      "category": "Achievement"
+    },
+    {
+      "id": "success",
+      "name": "Success",
+      "definition": "Success",
+      "category": "Achievement"
+    },
+    {
+      "id": "talent",
+      "name": "Talent",
+      "definition": "Talent",
+      "category": "Achievement"
+    },
+    {
+      "id": "victory",
+      "name": "Victory",
+      "definition": "Victory",
+      "category": "Achievement"
+    },
+    {
+      "id": "wealth",
+      "name": "Wealth",
+      "definition": "Wealth",
+      "category": "Achievement"
+    },
+    {
+      "id": "winning",
+      "name": "Winning",
+      "definition": "Winning",
+      "category": "Achievement"
+    },
+    {
+      "id": "ambition",
+      "name": "Ambition",
+      "definition": "Ambition",
+      "category": "Achievement"
+    },
+    {
+      "id": "acceptance",
+      "name": "Acceptance",
+      "definition": "Acceptance",
+      "category": "Feelings"
+    },
+    {
+      "id": "comfort",
+      "name": "Comfort",
+      "definition": "Comfort",
+      "category": "Feelings"
+    },
+    {
+      "id": "compassion",
+      "name": "Compassion",
+      "definition": "Compassion",
+      "category": "Feelings"
+    },
+    {
+      "id": "contentment",
+      "name": "Contentment",
+      "definition": "Contentment",
+      "category": "Feelings"
+    },
+    {
+      "id": "empathy",
+      "name": "Empathy",
+      "definition": "Empathy",
+      "category": "Feelings"
+    },
+    {
+      "id": "encouragement",
+      "name": "Encouragement",
+      "definition": "Encouragement",
+      "category": "Feelings"
+    },
+    {
+      "id": "feelings",
+      "name": "Feelings",
+      "definition": "Feelings",
+      "category": "Feelings"
+    },
+    {
+      "id": "grace",
+      "name": "Grace",
+      "definition": "Grace",
+      "category": "Feelings"
+    },
+    {
+      "id": "gratitude",
+      "name": "Gratitude",
+      "definition": "Gratitude",
+      "category": "Feelings"
+    },
+    {
+      "id": "happiness",
+      "name": "Happiness",
+      "definition": "Happiness",
+      "category": "Feelings"
+    },
+    {
+      "id": "hope",
+      "name": "Hope",
+      "definition": "Hope",
+      "category": "Feelings"
+    },
+    {
+      "id": "inspiring",
+      "name": "Inspiring",
+      "definition": "Inspiring",
+      "category": "Feelings"
+    },
+    {
+      "id": "irreverent",
+      "name": "Irreverent",
+      "definition": "Irreverent",
+      "category": "Feelings"
+    },
+    {
+      "id": "joy",
+      "name": "Joy",
+      "definition": "Joy",
+      "category": "Feelings"
+    },
+    {
+      "id": "kindness",
+      "name": "Kindness",
+      "definition": "Kindness",
+      "category": "Feelings"
+    },
+    {
+      "id": "love",
+      "name": "Love",
+      "definition": "Love",
+      "category": "Feelings"
+    },
+    {
+      "id": "optimism",
+      "name": "Optimism",
+      "definition": "Optimism",
+      "category": "Feelings"
+    },
+    {
+      "id": "passion",
+      "name": "Passion",
+      "definition": "Passion",
+      "category": "Feelings"
+    },
+    {
+      "id": "peace",
+      "name": "Peace",
+      "definition": "Peace",
+      "category": "Feelings"
+    },
+    {
+      "id": "poise",
+      "name": "Poise",
+      "definition": "Poise",
+      "category": "Feelings"
+    },
+    {
+      "id": "respect",
+      "name": "Respect",
+      "definition": "Respect",
+      "category": "Feelings"
+    },
+    {
+      "id": "reverence",
+      "name": "Reverence",
+      "definition": "Reverence",
+      "category": "Feelings"
+    },
+    {
+      "id": "satisfaction",
+      "name": "Satisfaction",
+      "definition": "Satisfaction",
+      "category": "Feelings"
+    },
+    {
+      "id": "serenity",
+      "name": "Serenity",
+      "definition": "Serenity",
+      "category": "Feelings"
+    },
+    {
+      "id": "thankful",
+      "name": "Thankful",
+      "definition": "Thankful",
+      "category": "Feelings"
+    },
+    {
+      "id": "tranquility",
+      "name": "Tranquility",
+      "definition": "Tranquility",
+      "category": "Feelings"
+    },
+    {
+      "id": "welcoming",
+      "name": "Welcoming",
+      "definition": "Welcoming",
+      "category": "Feelings"
+    },
+    {
+      "id": "brilliance",
+      "name": "Brilliance",
+      "definition": "Brilliance",
+      "category": "Intelligence"
+    },
+    {
+      "id": "clever",
+      "name": "Clever",
+      "definition": "Clever",
+      "category": "Intelligence"
+    },
+    {
+      "id": "common-sense",
+      "name": "Common sense",
+      "definition": "Common sense",
+      "category": "Intelligence"
+    },
+    {
+      "id": "foresight",
+      "name": "Foresight",
+      "definition": "Foresight",
+      "category": "Intelligence"
+    },
+    {
+      "id": "frugality",
+      "name": "Frugality",
+      "definition": "Frugality",
+      "category": "Intelligence"
+    },
+    {
+      "id": "genius",
+      "name": "Genius",
+      "definition": "Genius",
+      "category": "Intelligence"
+    },
+    {
+      "id": "insightful",
+      "name": "Insightful",
+      "definition": "Insightful",
+      "category": "Intelligence"
+    },
+    {
+      "id": "intelligence",
+      "name": "Intelligence",
+      "definition": "Intelligence",
+      "category": "Intelligence"
+    },
+    {
+      "id": "knowledge",
+      "name": "Knowledge",
+      "definition": "Knowledge",
+      "category": "Intelligence"
+    },
+    {
+      "id": "learning",
+      "name": "Learning",
+      "definition": "Learning",
+      "category": "Intelligence"
+    },
+    {
+      "id": "logic",
+      "name": "Logic",
+      "definition": "Logic",
+      "category": "Intelligence"
+    },
+    {
+      "id": "meaning",
+      "name": "Meaning",
+      "definition": "Meaning",
+      "category": "Intelligence"
+    },
+    {
+      "id": "prudence",
+      "name": "Prudence",
+      "definition": "Prudence",
+      "category": "Intelligence"
+    },
+    {
+      "id": "realistic",
+      "name": "Realistic",
+      "definition": "Realistic",
+      "category": "Intelligence"
+    },
+    {
+      "id": "reason",
+      "name": "Reason",
+      "definition": "Reason",
+      "category": "Intelligence"
+    },
+    {
+      "id": "reflective",
+      "name": "Reflective",
+      "definition": "Reflective",
+      "category": "Intelligence"
+    },
+    {
+      "id": "resolution",
+      "name": "Resolution",
+      "definition": "Resolution",
+      "category": "Intelligence"
+    },
+    {
+      "id": "smart",
+      "name": "Smart",
+      "definition": "Smart",
+      "category": "Intelligence"
+    },
+    {
+      "id": "thoughtful",
+      "name": "Thoughtful",
+      "definition": "Thoughtful",
+      "category": "Intelligence"
+    },
+    {
+      "id": "understanding",
+      "name": "Understanding",
+      "definition": "Understanding",
+      "category": "Intelligence"
+    },
+    {
+      "id": "vision",
+      "name": "Vision",
+      "definition": "Vision",
+      "category": "Intelligence"
+    },
+    {
+      "id": "wisdom",
+      "name": "Wisdom",
+      "definition": "Wisdom",
+      "category": "Intelligence"
+    },
+    {
+      "id": "assertiveness",
+      "name": "Assertiveness",
+      "definition": "Assertiveness",
+      "category": "Strength"
+    },
+    {
+      "id": "benevolence",
+      "name": "Benevolence",
+      "definition": "Benevolence",
+      "category": "Strength"
+    },
+    {
+      "id": "boldness",
+      "name": "Boldness",
+      "definition": "Boldness",
+      "category": "Strength"
+    },
+    {
+      "id": "bravery",
+      "name": "Bravery",
+      "definition": "Bravery",
+      "category": "Strength"
+    },
+    {
+      "id": "competence",
+      "name": "Competence",
+      "definition": "Competence",
+      "category": "Strength"
+    },
+    {
+      "id": "confidence",
+      "name": "Confidence",
+      "definition": "Confidence",
+      "category": "Strength"
+    },
+    {
+      "id": "conviction",
+      "name": "Conviction",
+      "definition": "Conviction",
+      "category": "Strength"
+    },
+    {
+      "id": "courage",
+      "name": "Courage",
+      "definition": "Courage",
+      "category": "Strength"
+    },
+    {
+      "id": "dedication",
+      "name": "Dedication",
+      "definition": "Dedication",
+      "category": "Strength"
+    },
+    {
+      "id": "directness",
+      "name": "Directness",
+      "definition": "Directness",
+      "category": "Strength"
+    },
+    {
+      "id": "discipline",
+      "name": "Discipline",
+      "definition": "Discipline",
+      "category": "Strength"
+    },
+    {
+      "id": "fearless",
+      "name": "Fearless",
+      "definition": "Fearless",
+      "category": "Strength"
+    },
+    {
+      "id": "ferocious",
+      "name": "Ferocious",
+      "definition": "Ferocious",
+      "category": "Strength"
+    },
+    {
+      "id": "fortitude",
+      "name": "Fortitude",
+      "definition": "Fortitude",
+      "category": "Strength"
+    },
+    {
+      "id": "intensity",
+      "name": "Intensity",
+      "definition": "Intensity",
+      "category": "Strength"
+    },
+    {
+      "id": "perseverance",
+      "name": "Perseverance",
+      "definition": "Perseverance",
+      "category": "Strength"
+    },
+    {
+      "id": "persistence",
+      "name": "Persistence",
+      "definition": "Persistence",
+      "category": "Strength"
+    },
+    {
+      "id": "power",
+      "name": "Power",
+      "definition": "Power",
+      "category": "Strength"
+    },
+    {
+      "id": "reliability",
+      "name": "Reliability",
+      "definition": "Reliability",
+      "category": "Strength"
+    },
+    {
+      "id": "restraint",
+      "name": "Restraint",
+      "definition": "Restraint",
+      "category": "Strength"
+    },
+    {
+      "id": "rigor",
+      "name": "Rigor",
+      "definition": "Rigor",
+      "category": "Strength"
+    },
+    {
+      "id": "self-control",
+      "name": "Self-control",
+      "definition": "Self-control",
+      "category": "Strength"
+    },
+    {
+      "id": "strength",
+      "name": "Strength",
+      "definition": "Strength",
+      "category": "Strength"
+    },
+    {
+      "id": "sustainability",
+      "name": "Sustainability",
+      "definition": "Sustainability",
+      "category": "Strength"
+    },
+    {
+      "id": "temperance",
+      "name": "Temperance",
+      "definition": "Temperance",
+      "category": "Strength"
+    },
+    {
+      "id": "tenacious",
+      "name": "Tenacious",
+      "definition": "Tenacious",
+      "category": "Strength"
+    },
+    {
+      "id": "toughness",
+      "name": "Toughness",
+      "definition": "Toughness",
+      "category": "Strength"
+    },
+    {
+      "id": "valor",
+      "name": "Valor",
+      "definition": "Valor",
+      "category": "Strength"
+    },
+    {
+      "id": "willfulness",
+      "name": "Willfulness",
+      "definition": "Willfulness",
+      "category": "Strength"
+    },
+    {
+      "id": "adaptability",
+      "name": "Adaptability",
+      "definition": "Adaptability",
+      "category": "Spirituality"
+    },
+    {
+      "id": "altruism",
+      "name": "Altruism",
+      "definition": "Altruism",
+      "category": "Spirituality"
+    },
+    {
+      "id": "authenticity",
+      "name": "Authenticity",
+      "definition": "Authenticity",
+      "category": "Spirituality"
+    },
+    {
+      "id": "balance",
+      "name": "Balance",
+      "definition": "Balance",
+      "category": "Spirituality"
+    },
+    {
+      "id": "charity",
+      "name": "Charity",
+      "definition": "Charity",
+      "category": "Spirituality"
+    },
+    {
+      "id": "communication",
+      "name": "Communication",
+      "definition": "Communication",
+      "category": "Spirituality"
+    },
+    {
+      "id": "community",
+      "name": "Community",
+      "definition": "Community",
+      "category": "Spirituality"
+    },
+    {
+      "id": "consciousness",
+      "name": "Consciousness",
+      "definition": "Consciousness",
+      "category": "Spirituality"
+    },
+    {
+      "id": "contribution",
+      "name": "Contribution",
+      "definition": "Contribution",
+      "category": "Spirituality"
+    },
+    {
+      "id": "cooperation",
+      "name": "Cooperation",
+      "definition": "Cooperation",
+      "category": "Spirituality"
+    },
+    {
+      "id": "courtesy",
+      "name": "Courtesy",
+      "definition": "Courtesy",
+      "category": "Spirituality"
+    },
+    {
+      "id": "detachment",
+      "name": "Detachment",
+      "definition": "Detachment",
+      "category": "Spirituality"
+    },
+    {
+      "id": "devotion",
+      "name": "Devotion",
+      "definition": "Devotion",
+      "category": "Spirituality"
+    },
+    {
+      "id": "equality",
+      "name": "Equality",
+      "definition": "Equality",
+      "category": "Spirituality"
+    },
+    {
+      "id": "ethical",
+      "name": "Ethical",
+      "definition": "Ethical",
+      "category": "Spirituality"
+    },
+    {
+      "id": "fairness",
+      "name": "Fairness",
+      "definition": "Fairness",
+      "category": "Spirituality"
+    },
+    {
+      "id": "faith",
+      "name": "Faith",
+      "definition": "Faith",
+      "category": "Spirituality"
+    },
+    {
+      "id": "family",
+      "name": "Family",
+      "definition": "Family",
+      "category": "Spirituality"
+    },
+    {
+      "id": "forgiveness",
+      "name": "Forgiveness",
+      "definition": "Forgiveness",
+      "category": "Spirituality"
+    },
+    {
+      "id": "friendship",
+      "name": "Friendship",
+      "definition": "Friendship",
+      "category": "Spirituality"
+    },
+    {
+      "id": "generosity",
+      "name": "Generosity",
+      "definition": "Generosity",
+      "category": "Spirituality"
+    },
+    {
+      "id": "gentleness",
+      "name": "Gentleness",
+      "definition": "Gentleness",
+      "category": "Spirituality"
+    },
+    {
+      "id": "giving",
+      "name": "Giving",
+      "definition": "Giving",
+      "category": "Spirituality"
+    },
+    {
+      "id": "goodness",
+      "name": "Goodness",
+      "definition": "Goodness",
+      "category": "Spirituality"
+    },
+    {
+      "id": "harmony",
+      "name": "Harmony",
+      "definition": "Harmony",
+      "category": "Spirituality"
+    },
+    {
+      "id": "humility",
+      "name": "Humility",
+      "definition": "Humility",
+      "category": "Spirituality"
+    },
+    {
+      "id": "integration",
+      "name": "Integration",
+      "definition": "Integration",
+      "category": "Spirituality"
+    },
+    {
+      "id": "maturity",
+      "name": "Maturity",
+      "definition": "Maturity",
+      "category": "Spirituality"
+    },
+    {
+      "id": "mysticism",
+      "name": "Mysticism",
+      "definition": "Mysticism",
+      "category": "Spirituality"
+    },
+    {
+      "id": "piety",
+      "name": "Piety",
+      "definition": "Piety",
+      "category": "Spirituality"
+    },
+    {
+      "id": "purpose",
+      "name": "Purpose",
+      "definition": "Purpose",
+      "category": "Spirituality"
+    },
+    {
+      "id": "selfless",
+      "name": "Selfless",
+      "definition": "Selfless",
+      "category": "Spirituality"
+    },
+    {
+      "id": "sensitivity",
+      "name": "Sensitivity",
+      "definition": "Sensitivity",
+      "category": "Spirituality"
+    },
+    {
+      "id": "service",
+      "name": "Service",
+      "definition": "Service",
+      "category": "Spirituality"
+    },
+    {
+      "id": "spirited",
+      "name": "Spirited",
+      "definition": "Spirited",
+      "category": "Spirituality"
+    },
+    {
+      "id": "spirituality",
+      "name": "Spirituality",
+      "definition": "Spirituality",
+      "category": "Spirituality"
+    },
+    {
+      "id": "stewardship",
+      "name": "Stewardship",
+      "definition": "Stewardship",
+      "category": "Spirituality"
+    },
+    {
+      "id": "tolerance",
+      "name": "Tolerance",
+      "definition": "Tolerance",
+      "category": "Spirituality"
+    },
+    {
+      "id": "tradition",
+      "name": "Tradition",
+      "definition": "Tradition",
+      "category": "Spirituality"
+    },
+    {
+      "id": "transcendence",
+      "name": "Transcendence",
+      "definition": "Transcendence",
+      "category": "Spirituality"
+    },
+    {
+      "id": "unity",
+      "name": "Unity",
+      "definition": "Unity",
+      "category": "Spirituality"
+    },
+    {
+      "id": "wholeness",
+      "name": "Wholeness",
+      "definition": "Wholeness",
+      "category": "Spirituality"
+    },
+    {
+      "id": "creation",
+      "name": "Creation",
+      "definition": "Creation",
+      "category": "Creativity"
+    },
+    {
+      "id": "creativity",
+      "name": "Creativity",
+      "definition": "Creativity",
+      "category": "Creativity"
+    },
+    {
+      "id": "curiosity",
+      "name": "Curiosity",
+      "definition": "Curiosity",
+      "category": "Creativity"
+    },
+    {
+      "id": "discovery",
+      "name": "Discovery",
+      "definition": "Discovery",
+      "category": "Creativity"
+    },
+    {
+      "id": "exploration",
+      "name": "Exploration",
+      "definition": "Exploration",
+      "category": "Creativity"
+    },
+    {
+      "id": "expressive",
+      "name": "Expressive",
+      "definition": "Expressive",
+      "category": "Creativity"
+    },
+    {
+      "id": "flow",
+      "name": "Flow",
+      "definition": "Flow",
+      "category": "Creativity"
+    },
+    {
+      "id": "imagination",
+      "name": "Imagination",
+      "definition": "Imagination",
+      "category": "Creativity"
+    },
+    {
+      "id": "innovation",
+      "name": "Innovation",
+      "definition": "Innovation",
+      "category": "Creativity"
+    },
+    {
+      "id": "inquisitive",
+      "name": "Inquisitive",
+      "definition": "Inquisitive",
+      "category": "Creativity"
+    },
+    {
+      "id": "intuitive",
+      "name": "Intuitive",
+      "definition": "Intuitive",
+      "category": "Creativity"
+    },
+    {
+      "id": "novelty",
+      "name": "Novelty",
+      "definition": "Novelty",
+      "category": "Creativity"
+    },
+    {
+      "id": "openness",
+      "name": "Openness",
+      "definition": "Openness",
+      "category": "Creativity"
+    },
+    {
+      "id": "originality",
+      "name": "Originality",
+      "definition": "Originality",
+      "category": "Creativity"
+    },
+    {
+      "id": "uniqueness",
+      "name": "Uniqueness",
+      "definition": "Uniqueness",
+      "category": "Creativity"
+    },
+    {
+      "id": "wonder",
+      "name": "Wonder",
+      "definition": "Wonder",
+      "category": "Creativity"
+    },
+    {
+      "id": "flexibility",
+      "name": "Flexibility",
+      "definition": "Flexibility",
+      "category": "Freedom"
+    },
+    {
+      "id": "freedom",
+      "name": "Freedom",
+      "definition": "Freedom",
+      "category": "Freedom"
+    },
+    {
+      "id": "independence",
+      "name": "Independence",
+      "definition": "Independence",
+      "category": "Freedom"
+    },
+    {
+      "id": "individuality",
+      "name": "Individuality",
+      "definition": "Individuality",
+      "category": "Freedom"
+    },
+    {
+      "id": "liberty",
+      "name": "Liberty",
+      "definition": "Liberty",
+      "category": "Freedom"
+    },
+    {
+      "id": "privacy",
+      "name": "Privacy",
+      "definition": "Privacy",
+      "category": "Freedom"
+    },
+    {
+      "id": "self-reliance",
+      "name": "Self-reliance",
+      "definition": "Self-reliance",
+      "category": "Freedom"
+    },
+    {
+      "id": "accuracy",
+      "name": "Accuracy",
+      "definition": "Accuracy",
+      "category": "Order"
+    },
+    {
+      "id": "careful",
+      "name": "Careful",
+      "definition": "Careful",
+      "category": "Order"
+    },
+    {
+      "id": "certainty",
+      "name": "Certainty",
+      "definition": "Certainty",
+      "category": "Order"
+    },
+    {
+      "id": "cleanliness",
+      "name": "Cleanliness",
+      "definition": "Cleanliness",
+      "category": "Order"
+    },
+    {
+      "id": "completion",
+      "name": "Completion",
+      "definition": "Completion",
+      "category": "Order"
+    },
+    {
+      "id": "consistency",
+      "name": "Consistency",
+      "definition": "Consistency",
+      "category": "Order"
+    },
+    {
+      "id": "control",
+      "name": "Control",
+      "definition": "Control",
+      "category": "Order"
+    },
+    {
+      "id": "decisive",
+      "name": "Decisive",
+      "definition": "Decisive",
+      "category": "Order"
+    },
+    {
+      "id": "diligence",
+      "name": "Diligence",
+      "definition": "Diligence",
+      "category": "Order"
+    },
+    {
+      "id": "economy",
+      "name": "Economy",
+      "definition": "Economy",
+      "category": "Order"
+    },
+    {
+      "id": "efficiency",
+      "name": "Efficiency",
+      "definition": "Efficiency",
+      "category": "Order"
+    },
+    {
+      "id": "justice",
+      "name": "Justice",
+      "definition": "Justice",
+      "category": "Order"
+    },
+    {
+      "id": "lawful",
+      "name": "Lawful",
+      "definition": "Lawful",
+      "category": "Order"
+    },
+    {
+      "id": "moderation",
+      "name": "Moderation",
+      "definition": "Moderation",
+      "category": "Order"
+    },
+    {
+      "id": "order",
+      "name": "Order",
+      "definition": "Order",
+      "category": "Order"
+    },
+    {
+      "id": "organization",
+      "name": "Organization",
+      "definition": "Organization",
+      "category": "Order"
+    },
+    {
+      "id": "preparedness",
+      "name": "Preparedness",
+      "definition": "Preparedness",
+      "category": "Order"
+    },
+    {
+      "id": "quality",
+      "name": "Quality",
+      "definition": "Quality",
+      "category": "Order"
+    },
+    {
+      "id": "security",
+      "name": "Security",
+      "definition": "Security",
+      "category": "Order"
+    },
+    {
+      "id": "sobriety",
+      "name": "Sobriety",
+      "definition": "Sobriety",
+      "category": "Order"
+    },
+    {
+      "id": "stability",
+      "name": "Stability",
+      "definition": "Stability",
+      "category": "Order"
+    },
+    {
+      "id": "structure",
+      "name": "Structure",
+      "definition": "Structure",
+      "category": "Order"
+    },
+    {
+      "id": "thorough",
+      "name": "Thorough",
+      "definition": "Thorough",
+      "category": "Order"
+    },
+    {
+      "id": "timeliness",
+      "name": "Timeliness",
+      "definition": "Timeliness",
+      "category": "Order"
+    },
+    {
+      "id": "adventure",
+      "name": "Adventure",
+      "definition": "Adventure",
+      "category": "Enjoyment"
+    },
+    {
+      "id": "amusement",
+      "name": "Amusement",
+      "definition": "Amusement",
+      "category": "Enjoyment"
+    },
+    {
+      "id": "enjoyment",
+      "name": "Enjoyment",
+      "definition": "Enjoyment",
+      "category": "Enjoyment"
+    },
+    {
+      "id": "enthusiasm",
+      "name": "Enthusiasm",
+      "definition": "Enthusiasm",
+      "category": "Enjoyment"
+    },
+    {
+      "id": "experience",
+      "name": "Experience",
+      "definition": "Experience",
+      "category": "Enjoyment"
+    },
+    {
+      "id": "fulfillment",
+      "name": "Fulfillment",
+      "definition": "Fulfillment",
+      "category": "Enjoyment"
+    },
+    {
+      "id": "fun",
+      "name": "Fun",
+      "definition": "Fun",
+      "category": "Enjoyment"
+    },
+    {
+      "id": "humor",
+      "name": "Humor",
+      "definition": "Humor",
+      "category": "Enjoyment"
+    },
+    {
+      "id": "playfulness",
+      "name": "Playfulness",
+      "definition": "Playfulness",
+      "category": "Enjoyment"
+    },
+    {
+      "id": "recreation",
+      "name": "Recreation",
+      "definition": "Recreation",
+      "category": "Enjoyment"
+    },
+    {
+      "id": "spontaneous",
+      "name": "Spontaneous",
+      "definition": "Spontaneous",
+      "category": "Enjoyment"
+    },
+    {
+      "id": "surprise",
+      "name": "Surprise",
+      "definition": "Surprise",
+      "category": "Enjoyment"
+    },
+    {
+      "id": "alertness",
+      "name": "Alertness",
+      "definition": "Alertness",
+      "category": "Presence"
+    },
+    {
+      "id": "attentive",
+      "name": "Attentive",
+      "definition": "Attentive",
+      "category": "Presence"
+    },
+    {
+      "id": "awareness",
+      "name": "Awareness",
+      "definition": "Awareness",
+      "category": "Presence"
+    },
+    {
+      "id": "beauty",
+      "name": "Beauty",
+      "definition": "Beauty",
+      "category": "Presence"
+    },
+    {
+      "id": "calm",
+      "name": "Calm",
+      "definition": "Calm",
+      "category": "Presence"
+    },
+    {
+      "id": "clear",
+      "name": "Clear",
+      "definition": "Clear",
+      "category": "Presence"
+    },
+    {
+      "id": "concentration",
+      "name": "Concentration",
+      "definition": "Concentration",
+      "category": "Presence"
+    },
+    {
+      "id": "equanimity",
+      "name": "Equanimity",
+      "definition": "Equanimity",
+      "category": "Presence"
+    },
+    {
+      "id": "focus",
+      "name": "Focus",
+      "definition": "Focus",
+      "category": "Presence"
+    },
+    {
+      "id": "grounded",
+      "name": "Grounded",
+      "definition": "Grounded",
+      "category": "Presence"
+    },
+    {
+      "id": "patience",
+      "name": "Patience",
+      "definition": "Patience",
+      "category": "Presence"
+    },
+    {
+      "id": "present",
+      "name": "Present",
+      "definition": "Present",
+      "category": "Presence"
+    },
+    {
+      "id": "silence",
+      "name": "Silence",
+      "definition": "Silence",
+      "category": "Presence"
+    },
+    {
+      "id": "simplicity",
+      "name": "Simplicity",
+      "definition": "Simplicity",
+      "category": "Presence"
+    },
+    {
+      "id": "solitude",
+      "name": "Solitude",
+      "definition": "Solitude",
+      "category": "Presence"
+    },
+    {
+      "id": "stillness",
+      "name": "Stillness",
+      "definition": "Stillness",
+      "category": "Presence"
+    },
+    {
+      "id": "energy",
+      "name": "Energy",
+      "definition": "Energy",
+      "category": "Health"
+    },
+    {
+      "id": "health",
+      "name": "Health",
+      "definition": "Health",
+      "category": "Health"
+    },
+    {
+      "id": "holism",
+      "name": "Holism",
+      "definition": "Holism",
+      "category": "Health"
+    },
+    {
+      "id": "longevity",
+      "name": "Longevity",
+      "definition": "Longevity",
+      "category": "Health"
+    },
+    {
+      "id": "radience",
+      "name": "Radience",
+      "definition": "Radience",
+      "category": "Health"
+    },
+    {
+      "id": "thrive",
+      "name": "Thrive",
+      "definition": "Thrive",
+      "category": "Health"
+    },
+    {
+      "id": "vigor",
+      "name": "Vigor",
+      "definition": "Vigor",
+      "category": "Health"
+    },
+    {
+      "id": "vitality",
+      "name": "Vitality",
+      "definition": "Vitality",
+      "category": "Health"
+    },
+    {
+      "id": "well-being",
+      "name": "Well-Being",
+      "definition": "Well-Being",
+      "category": "Health"
+    },
+    {
+      "id": "wellness",
+      "name": "Wellness",
+      "definition": "Wellness",
+      "category": "Health"
+    },
+    {
+      "id": "caring",
+      "name": "Caring",
+      "definition": "Caring",
+      "category": "Relationship"
+    },
+    {
+      "id": "concord",
+      "name": "Concord",
+      "definition": "Concord",
+      "category": "Relationship"
+    },
+    {
+      "id": "connection",
+      "name": "Connection",
+      "definition": "Connection",
+      "category": "Relationship"
+    },
+    {
+      "id": "consideration",
+      "name": "Consideration",
+      "definition": "Consideration",
+      "category": "Relationship"
+    },
+    {
+      "id": "fidelity",
+      "name": "Fidelity",
+      "definition": "Fidelity",
+      "category": "Relationship"
+    },
+    {
+      "id": "helpfulness",
+      "name": "Helpfulness",
+      "definition": "Helpfulness",
+      "category": "Relationship"
+    },
+    {
+      "id": "loyalty",
+      "name": "Loyalty",
+      "definition": "Loyalty",
+      "category": "Relationship"
+    },
+    {
+      "id": "sharing",
+      "name": "Sharing",
+      "definition": "Sharing",
+      "category": "Relationship"
+    },
+    {
+      "id": "support",
+      "name": "Support",
+      "definition": "Support",
+      "category": "Relationship"
+    },
+    {
+      "id": "teamwork",
+      "name": "Teamwork",
+      "definition": "Teamwork",
+      "category": "Relationship"
+    },
+    {
+      "id": "trust",
+      "name": "Trust",
+      "definition": "Trust",
+      "category": "Relationship"
+    }
+  ]
+}

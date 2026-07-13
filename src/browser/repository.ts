@@ -25,10 +25,12 @@ import cardSort from "../../data/presets/card-sort.json";
 import emptyCustom from "../../data/presets/empty-custom.json";
 import broad100 from "../../data/presets/broad-100.json";
 import millerPersonalValues from "../../data/presets/miller-personal-values.json";
+import scottJeffreyCoreValues from "../../data/presets/scott-jeffrey-core-values.json";
 
 export const presetCatalog = [
   broad100,
   millerPersonalValues,
+  scottJeffreyCoreValues,
   schwartz10,
   schwartz19,
   rokeachTerminal,

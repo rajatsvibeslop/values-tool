@@ -262,4 +262,17 @@ details > summary { cursor: pointer; font-weight: 700; }
   .panel { box-shadow: none; break-inside: avoid; }
   .report { padding: 0; border: 0; }
   .relation-wrap { overflow: visible; }
+  .relation-matrix,
+  .relation-matrix td,
+  .relation-above,
+  .relation-below,
+  .relation-overlap,
+  .matrix,
+  .matrix td,
+  .above,
+  .below,
+  .overlap {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
 }
