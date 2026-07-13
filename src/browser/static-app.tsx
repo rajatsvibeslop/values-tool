@@ -3651,22 +3651,38 @@ function Reports({ repo, db }: ViewProps) {
               </option>
             ))}
           </select>
-          <button className="btn no-print" onClick={() => print()}>
+          <button type="button" className="btn no-print" onClick={() => print()}>
             Print
           </button>
           <button
+            type="button"
             className="btn no-print"
             onClick={() => download(`${set.name}.html`, html, "text/html")}
           >
             <Download size={14} /> HTML
           </button>
           <button
+            type="button"
             className="btn no-print"
             onClick={() =>
               download(`${set.name}.md`, markdown, "text/markdown")
             }
           >
             <Download size={14} /> Markdown
+          </button>
+          <button
+            type="button"
+            className="btn no-print"
+            onClick={() => void exportReportPng("matrix", set.name, rows, tiers)}
+          >
+            <Download size={14} /> Matrix PNG
+          </button>
+          <button
+            type="button"
+            className="btn no-print"
+            onClick={() => void exportReportPng("tiers", set.name, rows, tiers)}
+          >
+            <Download size={14} /> Tiers PNG
           </button>
         </>
       }
@@ -4518,6 +4534,295 @@ function download(name: string, contents: string, type: string) {
   anchor.click();
   URL.revokeObjectURL(url);
 }
+
+type ReportImageKind = "matrix" | "tiers";
+
+async function exportReportPng(
+  kind: ReportImageKind,
+  setName: string,
+  rows: RatingRow[],
+  tiers: RatingRow[][],
+) {
+  if ("fonts" in document && document.fonts?.ready) await document.fonts.ready;
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas is not available in this browser");
+  canvas.width = 1;
+  canvas.height = 1;
+  ctx.textBaseline = "top";
+  if (kind === "matrix") {
+    renderMatrixPng(ctx, canvas, setName, rows, tiers);
+  } else {
+    renderTierPng(ctx, canvas, setName, rows, tiers);
+  }
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((result) => {
+      if (result) resolve(result);
+      else reject(new Error("Failed to generate PNG"));
+    }, "image/png");
+  });
+  downloadBlob(`${sanitizeFilename(setName)}-${kind}.png`, blob);
+}
+
+function downloadBlob(name: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = name;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function sanitizeFilename(value: string) {
+  return value
+    .trim()
+    .replace(/[^a-z0-9\-_.]+/gi, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80) || "values-report";
+}
+
+function drawRoundedRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+) {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + width, y, x + width, y + height, r);
+  ctx.arcTo(x + width, y + height, x, y + height, r);
+  ctx.arcTo(x, y + height, x, y, r);
+  ctx.arcTo(x, y, x + width, y, r);
+  ctx.closePath();
+}
+
+function fitText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  font = ctx.font,
+) {
+  ctx.font = font;
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  const ellipsis = "…";
+  let current = text;
+  while (current.length > 1 && ctx.measureText(`${current}${ellipsis}`).width > maxWidth)
+    current = current.slice(0, -1);
+  return `${current}${ellipsis}`;
+}
+
+function wrapText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  font: string,
+) {
+  ctx.font = font;
+  const words = text.split(/\s+/).filter(Boolean);
+  if (!words.length) return [""];
+  const lines: string[] = [];
+  let current = words[0]!;
+  for (const word of words.slice(1)) {
+    const candidate = `${current} ${word}`;
+    if (ctx.measureText(candidate).width <= maxWidth) current = candidate;
+    else {
+      lines.push(current);
+      current = word;
+    }
+  }
+  lines.push(current);
+  return lines;
+}
+
+function renderTierPng(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  setName: string,
+  rows: RatingRow[],
+  tiers: RatingRow[][],
+) {
+  const width = 1600;
+  const left = 110;
+  const right = 48;
+  const contentWidth = width - left - right;
+  const titleFont = "700 30px system-ui, sans-serif";
+  const subtitleFont = "500 14px system-ui, sans-serif";
+  const labelFont = "700 18px system-ui, sans-serif";
+  const chipFont = "600 15px system-ui, sans-serif";
+  ctx.font = chipFont;
+
+  const layout = tiers.map((tier, index) => {
+    const chips: { name: string; width: number }[] = tier.map((row) => ({
+      name: row.name,
+      width: Math.ceil(ctx.measureText(row.name).width) + 28,
+    }));
+    const lineHeight = 36;
+    const gap = 8;
+    let x = 0;
+    let lines = 1;
+    for (const chip of chips) {
+      if (x > 0 && x + chip.width > contentWidth) {
+        lines += 1;
+        x = 0;
+      }
+      x += chip.width + gap;
+    }
+    return { index, chips, lines };
+  });
+
+  const headerHeight = 86;
+  const rowHeights = layout.map((tier) => Math.max(58, tier.lines * 36 + 16));
+  const height = headerHeight + rowHeights.reduce((sum, value) => sum + value, 0) + 24;
+  canvas.width = width;
+  canvas.height = height;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = "#101418";
+  ctx.font = titleFont;
+  ctx.fillText(setName, 48, 30);
+  ctx.font = subtitleFont;
+  ctx.fillStyle = "#66727b";
+  ctx.fillText(`${tiers.length} tiers · ${rows.length} values`, 48, 60);
+  ctx.fillStyle = "#101418";
+
+  let y = headerHeight;
+  layout.forEach((tier, tierIndex) => {
+    const rowHeight = rowHeights[tierIndex]!;
+    ctx.fillStyle = tierIndex % 2 === 0 ? "#f7f9fb" : "#ffffff";
+    ctx.fillRect(0, y, width, rowHeight);
+    ctx.fillStyle = "#101418";
+    ctx.font = labelFont;
+    ctx.fillText(`Tier ${tierIndex + 1}`, 48, y + 18);
+    ctx.font = subtitleFont;
+    ctx.fillStyle = "#66727b";
+    ctx.fillText(`${tier.chips.length} values`, 48, y + 44);
+    let x = left;
+    let chipY = y + 12;
+    const chipGap = 8;
+    const lineHeight = 36;
+    tier.chips.forEach((chip) => {
+      if (x > left && x + chip.width > left + contentWidth) {
+        x = left;
+        chipY += lineHeight;
+      }
+      ctx.fillStyle = "#eef2f7";
+      drawRoundedRect(ctx, x, chipY, chip.width, 28, 8);
+      ctx.fill();
+      ctx.fillStyle = "#101418";
+      ctx.font = chipFont;
+      ctx.fillText(chip.name, x + 14, chipY + 6);
+      x += chip.width + chipGap;
+    });
+    ctx.strokeStyle = "#d9dee2";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, y + rowHeight - 0.5);
+    ctx.lineTo(width, y + rowHeight - 0.5);
+    ctx.stroke();
+    y += rowHeight;
+  });
+}
+
+function renderMatrixPng(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  setName: string,
+  rows: RatingRow[],
+  tiers: RatingRow[][],
+) {
+  const cell = Math.max(8, Math.min(18, Math.floor(980 / Math.max(1, rows.length))));
+  const margin = 40;
+  const labelWidth = Math.min(260, Math.max(160, Math.max(...rows.map((row) => row.name.length)) * 7));
+  const top = 110;
+  const gridWidth = rows.length * cell;
+  const gridHeight = rows.length * cell;
+  const width = Math.max(1200, margin * 2 + labelWidth + gridWidth);
+  const height = top + gridHeight + 60;
+  canvas.width = width;
+  canvas.height = height;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = "#101418";
+  ctx.font = "700 30px system-ui, sans-serif";
+  ctx.fillText(`${setName} matrix`, margin, 28);
+  ctx.font = "500 14px system-ui, sans-serif";
+  ctx.fillStyle = "#66727b";
+  ctx.fillText("Green = above, amber = unresolved, gray = below, black = same", margin, 60);
+
+  const legendY = 82;
+  const legend = [
+    ["Above", "#14805e"],
+    ["Unresolved", "#d99000"],
+    ["Below", "#cbd2d7"],
+    ["Same", "#111315"],
+  ] as const;
+  let legendX = margin;
+  ctx.font = "600 13px system-ui, sans-serif";
+  legend.forEach(([label, color]) => {
+    ctx.fillStyle = color;
+    drawRoundedRect(ctx, legendX, legendY, 12, 12, 4);
+    ctx.fill();
+    ctx.fillStyle = "#101418";
+    ctx.fillText(label, legendX + 18, legendY - 1);
+    legendX += 110;
+  });
+
+  const starts = new Set<number>();
+  let offset = 0;
+  for (const tier of tiers) {
+    starts.add(offset);
+    offset += tier.length;
+  }
+
+  const gridX = margin + labelWidth;
+  const gridY = top;
+  ctx.font = `600 ${Math.max(9, Math.min(13, cell - 2))}px ui-monospace, monospace`;
+  rows.forEach((row, index) => {
+    const y = gridY + index * cell;
+    if (starts.has(index)) {
+      ctx.strokeStyle = "#101418";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(margin, y - 1);
+      ctx.lineTo(width - margin, y - 1);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#101418";
+    ctx.font = "600 13px system-ui, sans-serif";
+    ctx.fillText(fitText(ctx, `${index + 1}. ${row.name}`, labelWidth - 14, "600 13px system-ui, sans-serif"), margin, y + Math.max(2, (cell - 13) / 2));
+    ctx.font = `600 ${Math.max(9, Math.min(13, cell - 2))}px ui-monospace, monospace`;
+    rows.forEach((other, colIndex) => {
+      const relation = rankRelation(row, other);
+      const colors = {
+        above: "#14805e",
+        below: "#cbd2d7",
+        overlap: "#d99000",
+        same: "#111315",
+      } as const;
+      ctx.fillStyle = colors[relation];
+      ctx.fillRect(gridX + colIndex * cell, y, cell - 1, cell - 1);
+    });
+  });
+
+  ctx.fillStyle = "#101418";
+  ctx.font = "600 12px system-ui, sans-serif";
+  rows.forEach((row, index) => {
+    ctx.save();
+    ctx.translate(gridX + index * cell + cell / 2, gridY - 8);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText(String(index + 1), -4, 0);
+    ctx.restore();
+  });
+}
+
 function toCsv(rows: Record<string, unknown>[]) {
   if (!rows.length) return "";
   const columns = Object.keys(rows[0]!);
