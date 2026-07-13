@@ -8,6 +8,9 @@ export interface ScenarioValue {
 export interface ScenarioRequest {
   values: ScenarioValue[];
   contexts: string[];
+  contextText?: string;
+  domain?: string;
+  choiceCount: number;
   purpose: string;
   question: number;
   profiles?: ScenarioProfile[];
@@ -59,13 +62,14 @@ function hash(input: string): number {
 export function buildScenarioProfiles(
   values: ScenarioValue[],
   seed: string,
+  count = 3,
 ): ScenarioProfile[] {
   return [...values]
     .sort(
       (left, right) =>
         hash(`${seed}:${left.id ?? left.name}`) - hash(`${seed}:${right.id ?? right.name}`),
     )
-    .slice(0, Math.min(3, values.length))
+    .slice(0, Math.min(Math.max(2, count), values.length))
     .map((value, index) => ({
       id: String.fromCharCode(65 + index),
       focalValueId: value.id ?? value.name,
@@ -73,12 +77,12 @@ export function buildScenarioProfiles(
 }
 
 export function deriveScenario(input: ScenarioRequest): GeneratedScenario {
-  const context = input.contexts.length ? input.contexts.join(" and ") : "an important life decision";
+  const context = input.contextText?.trim() || (input.contexts.length ? input.contexts.join(" and ") : "an important life decision");
   const profiles = input.profiles?.length
     ? input.profiles
-    : buildScenarioProfiles(input.values, `${input.purpose}:${input.question}`);
+    : buildScenarioProfiles(input.values, `${input.purpose}:${input.question}`, input.choiceCount);
   return {
-    text: `In ${context}, several people face the same consequential decision. Each protects something important while accepting a different cost.`,
+    text: `${input.domain ? `${input.domain}: ` : ""}In ${context}, several people face the same consequential decision. Each protects something important while accepting a different cost.`,
     provider: "local",
     model: "definition-derived",
     generatedAt: new Date().toISOString(),
@@ -105,7 +109,8 @@ Requirements:
 - Make all supplied values genuinely relevant and in tension.
 - Do not name the values or reveal a preferred answer.
 - Use the supplied definitions, not stereotypes about the labels.
-- Use the context and session purpose when supplied.
+- Use the domain, freeform context, and session purpose when supplied.
+- Thread the freeform details directly into the scenario facts so the result can reflect the user's life, job, and situation.
 - Establish exactly one shared decision, one set of actors, and one set of facts.
 - Every action must respond to that exact decision. Actions must not introduce any fact,
   obligation, relationship, hazard, organization, or constraint absent from the scenario.
@@ -122,7 +127,8 @@ Requirements:
 - Return only JSON in this shape:
   {"scenario":"...","anchor":"the exact shared decision","choices":[{"id":"A","action":"..."}]}.
 
-Context: ${input.contexts.join(", ") || "General life"}
+Domain: ${input.domain || "General life"}
+Context: ${input.contextText || input.contexts.join(", ") || "General life"}
 Purpose: ${input.purpose || "Clarify personal priorities"}
 Values:
 ${input.values.map((value, index) => `${index}. ${value.name}: ${value.definition || "No definition supplied"} (${value.category || "uncategorized"})`).join("\n")}
@@ -287,7 +293,7 @@ export class OpenAICompatibleScenarioProvider implements ScenarioProvider {
       profiles:
         input.profiles?.length
           ? input.profiles
-          : buildScenarioProfiles(input.values, `${input.purpose}:${input.question}`),
+          : buildScenarioProfiles(input.values, `${input.purpose}:${input.question}`, input.choiceCount),
     };
     const openRouter = this.config.provider === "openrouter";
     const endpoint = openRouter

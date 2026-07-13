@@ -63,6 +63,7 @@ export function getSettings() {
     convergence: { ...DEFAULT_SETTINGS.convergence, ...(entries.convergence as object | undefined) },
     display: { ...DEFAULT_SETTINGS.display, ...(entries.display as object | undefined) },
     export: { ...DEFAULT_SETTINGS.export, ...(entries.export as object | undefined) },
+    quiz: { ...DEFAULT_SETTINGS.quiz, ...(entries.quiz as object | undefined) },
   };
 }
 

@@ -9,6 +9,7 @@ import {
 } from "@/domain/scenarios";
 
 const request = {
+  choiceCount: 2,
   contexts: ["Work"],
   purpose: "Choose a career direction",
   question: 1,

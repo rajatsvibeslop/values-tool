@@ -102,6 +102,13 @@ export interface SessionRow {
   started_at: number;
   updated_at: number;
 }
+
+export interface QuizSessionConfig {
+  domainId: string;
+  contextPreset: string;
+  contextText: string;
+  choiceCount: number;
+}
 export interface QueueRow {
   id: string;
   session_id: string;
@@ -171,6 +178,7 @@ export class BrowserRepository {
       },
       display: { ...DEFAULT_SETTINGS.display, ...(values.display as object) },
       export: { ...DEFAULT_SETTINGS.export, ...(values.export as object) },
+      quiz: { ...DEFAULT_SETTINGS.quiz, ...(values.quiz as object) },
     };
   }
 
@@ -220,6 +228,22 @@ export class BrowserRepository {
       ? parsed<"exact" | "rapid" | "portrait">(row.value, "exact")
       : "exact";
     return mode === "rapid" || mode === "portrait" ? mode : "exact";
+  }
+
+  quizSessionConfig(sessionId: string): QuizSessionConfig | null {
+    const row = this.db.one<{ value: string }>(
+      "SELECT value FROM application_settings WHERE key=?",
+      [`quiz-session:${sessionId}`],
+    );
+    if (!row) return null;
+    const stored = parsed<Partial<QuizSessionConfig> | null>(row.value, null);
+    if (!stored) return null;
+    return {
+      domainId: String(stored.domainId ?? "general-life"),
+      contextPreset: String(stored.contextPreset ?? ""),
+      contextText: String(stored.contextText ?? ""),
+      choiceCount: Math.min(7, Math.max(2, Number(stored.choiceCount ?? 5))),
+    };
   }
 
   rapidQuestion(sessionId: string): RapidQuestion | null {
@@ -988,6 +1012,7 @@ export class BrowserRepository {
     name: string,
     contextIds: string[],
     mode: "exact" | "rapid" | "portrait" = "exact",
+    quizConfig: QuizSessionConfig | null = null,
   ): Promise<string> {
     const id = uid();
     const stamp = now();
@@ -1025,6 +1050,11 @@ export class BrowserRepository {
         "INSERT INTO application_settings(key,value,updated_at) VALUES (?,?,?)",
         [`session-mode:${id}`, json(mode), stamp],
       );
+      if (quizConfig)
+        this.db.run(
+          "INSERT INTO application_settings(key,value,updated_at) VALUES (?,?,?)",
+          [`quiz-session:${id}`, json(quizConfig), stamp],
+        );
     });
     await this.regenerateQueue(id);
     return id;
@@ -1115,9 +1145,14 @@ export class BrowserRepository {
   ): RapidQuestion | null {
     const values = this.values(session.value_set_id);
     const portraitMode = this.sessionMode(session.id) === "portrait";
+    const quizConfig = this.quizSessionConfig(session.id);
+    const choiceCount = Math.min(
+      Math.max(2, quizConfig?.choiceCount ?? this.settings().quiz.defaultChoiceCount ?? 5),
+      7,
+    );
     const minimumBudget = portraitMode
       ? portraitQuestionBudget(values.length)
-      : rapidQuestionBudget(values.length);
+      : rapidQuestionBudget(values.length, choiceCount);
     const diagnostics = this.sessionConvergence(session.id);
     const targetReached =
       diagnostics.insufficientValues === 0 &&
@@ -1152,6 +1187,7 @@ export class BrowserRepository {
       seed: `${session.value_set_id}:${this.exactScope(session.id)}`,
       completedQuestions,
       questionBudget,
+      groupSize: choiceCount,
       avoidValueIds,
     });
     if (!group) return null;
@@ -1176,9 +1212,12 @@ export class BrowserRepository {
           definition: value.personal_definition || value.short_definition,
           category: value.parent_category,
         })),
+        domain: this.domainLabel(quizConfig?.domainId ?? ""),
+        contextText: this.quizContextText(session.id, quizConfig),
         contexts: contextNames,
         purpose: session.name,
         question: group.question,
+        choiceCount,
       }),
     };
   }
@@ -1186,9 +1225,14 @@ export class BrowserRepository {
   private async regenerateRapidQueue(session: SessionRow): Promise<void> {
     const values = this.values(session.value_set_id);
     const portraitMode = this.sessionMode(session.id) === "portrait";
+    const quizConfig = this.quizSessionConfig(session.id);
+    const choiceCount = Math.min(
+      Math.max(2, quizConfig?.choiceCount ?? this.settings().quiz.defaultChoiceCount ?? 5),
+      7,
+    );
     const questionBudget = portraitMode
       ? portraitQuestionBudget(values.length)
-      : rapidQuestionBudget(values.length);
+      : rapidQuestionBudget(values.length, choiceCount);
     const prepared = this.preparedRapidQuestions(session.id);
     const promoted = prepared.find(
       (question) => question.question === session.completed_count + 1,
@@ -1257,6 +1301,23 @@ export class BrowserRepository {
         [`rapid-question:${session.id}`, json(question), stamp],
       );
     });
+  }
+
+  private domainLabel(domainId: string): string {
+    const quiz = this.settings().quiz;
+    return quiz.domains.find((domain) => domain.id === domainId)?.name || "General";
+  }
+
+  private quizContextText(sessionId: string, config: QuizSessionConfig | null): string {
+    const contextText = config?.contextText.trim() ?? "";
+    const contextPreset = config?.contextPreset.trim() ?? "";
+    const contextNames = this.contexts()
+      .filter((context) => this.sessionContexts(sessionId).includes(context.id))
+      .map((context) => context.name);
+    return [contextPreset, contextText, ...contextNames]
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .join(". ");
   }
 
   sessionConvergence(sessionId: string): ConvergenceDiagnostics {

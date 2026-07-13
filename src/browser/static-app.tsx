@@ -14,6 +14,7 @@ import {
   History,
   GripVertical,
   ListOrdered,
+  Menu,
   Moon,
   Plus,
   RefreshCw,
@@ -160,54 +161,49 @@ export function StaticApp() {
   }
   return (
     <div className="app-shell" data-revision={revision}>
-      <aside className="sidebar">
-        <a className="brand" href="#quiz">
+      <header className="shell-topbar">
+        <details className="shell-menu">
+          <summary className="shell-menu-trigger" aria-label="Open navigation">
+            <Menu size={18} />
+          </summary>
+          <div className="shell-menu-popover">
+            {nav.map(([href, label, Icon]) => (
+              <a
+                className={`shell-menu-item ${route === href ? "shell-menu-active" : ""}`}
+                href={`#${href}`}
+                key={href}
+              >
+                <Icon size={16} />
+                <span>{label}</span>
+              </a>
+            ))}
+          </div>
+        </details>
+        <a className="shell-brand" href="#quiz">
           <span className="brand-mark">
             <SlidersHorizontal size={16} />
           </span>
           <span>Values Lab</span>
         </a>
-        <nav className="nav-list" aria-label="Primary navigation">
-          {nav.map(([href, label, Icon]) => (
-            <a
-              className={`nav-item ${route === href ? "tab-active" : ""}`}
-              href={`#${href}`}
-              key={href}
-            >
-              <Icon size={19} />
-              <span>{label}</span>
-            </a>
-          ))}
-        </nav>
-        <div className="sidebar-footer">
-          <button
-            className="btn btn-icon btn-sm"
-            onClick={theme}
-            aria-label="Toggle color theme"
-          >
-            {dark ? <Sun size={16} /> : <Moon size={16} />}
-          </button>
-        </div>
-      </aside>
-      <div className="content-shell">
-        <header className="topbar">
-          <div className="topbar-title">
-            <strong>Values Lab</strong>
-            <span className="muted small">Quiz / Reports / Settings</span>
-          </div>
-        </header>
-        <main>
-          {error && (
-            <div className="page" style={{ paddingBottom: 0 }}>
-              <div className="notice notice-warning">
-                <strong>Action failed</strong>
-                <div>{error}</div>
-              </div>
+        <button
+          className="btn btn-icon btn-sm shell-theme"
+          onClick={theme}
+          aria-label="Toggle color theme"
+        >
+          {dark ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
+      </header>
+      <main className="content-shell">
+        {error && (
+          <div className="page" style={{ paddingBottom: 0 }}>
+            <div className="notice notice-warning">
+              <strong>Action failed</strong>
+              <div>{error}</div>
             </div>
-          )}
-          <Router route={route} repo={repo} db={db} mutate={mutate} />
-        </main>
-      </div>
+          </div>
+        )}
+        <Router route={route} repo={repo} db={db} mutate={mutate} />
+      </main>
     </div>
   );
 }
@@ -1096,32 +1092,45 @@ function Compare({ repo, db, mutate }: ViewProps) {
   const activeSession = sessions.find((item) => item.status === "active");
   const [sessionId, setSessionId] = useState(activeSession?.id ?? "");
   const [creating, setCreating] = useState(!activeSession);
-  const sessionMode = "portrait" as const;
-  const [newSetId, setNewSetId] = useState(
-    localStorage.getItem("values-set") ??
-      sets[0]?.id ??
+  const sessionMode = "rapid" as const;
+  const quizSettings = settings.quiz;
+  const quizDomains = quizSettings.domains.filter((domain) => !domain.archived);
+  const defaultDomainId =
+    localStorage.getItem("quiz-domain") ||
+    quizSettings.defaultDomainId ||
+    quizDomains[0]?.id ||
+    "general-life";
+  const defaultDomain =
+    quizDomains.find((domain) => domain.id === defaultDomainId) ?? quizDomains[0];
+  const [startDomainId, setStartDomainId] = useState<string>(defaultDomain?.id ?? defaultDomainId);
+  const [startContextPreset, setStartContextPreset] = useState(
+    localStorage.getItem("quiz-context-preset") || defaultDomain?.contextPrompt || "",
+  );
+  const [startContextText, setStartContextText] = useState(
+    localStorage.getItem("quiz-context-details") || "",
+  );
+  const [startChoiceCount, setStartChoiceCount] = useState(
+    Math.min(
+      7,
+      Math.max(
+        2,
+        Number(localStorage.getItem("quiz-choice-count") ?? quizSettings.defaultChoiceCount ?? 5),
+      ),
+    ),
+  );
+  const [startSetChoice, setStartSetChoice] = useState(
+    localStorage.getItem("values-set") ||
+      defaultDomain?.valueSetId ||
+      sets[0]?.id ||
       `preset:${presetCatalog[0]!.slug}`,
   );
-  const importedPresetSlugs = new Set(
-    sets.flatMap((set) => {
-      try {
-        const metadata = JSON.parse(set.source_metadata) as { preset?: string };
-        return metadata.preset ? [metadata.preset] : [];
-      } catch {
-        return [];
-      }
-    }),
-  );
-  const availablePresets = presetCatalog.filter(
-    (preset) => !importedPresetSlugs.has(preset.slug),
-  );
-  const setChoice =
-    sets.some((set) => set.id === newSetId) || newSetId.startsWith("preset:")
-      ? newSetId
-      : (sets[0]?.id ?? `preset:${presetCatalog[0]!.slug}`);
-  const setChoiceName = setChoice.startsWith("preset:")
-    ? presetCatalog.find((preset) => `preset:${preset.slug}` === setChoice)?.name
-    : sets.find((set) => set.id === setChoice)?.name;
+  const selectedDomain =
+    quizDomains.find((domain) => domain.id === startDomainId) ?? defaultDomain;
+  const selectedSetChoice =
+    selectedDomain?.valueSetId?.trim() ||
+    startSetChoice ||
+    sets[0]?.id ||
+    `preset:${presetCatalog[0]!.slug}`;
   const session = creating
     ? undefined
     : sessions.find((item) => item.id === sessionId);
@@ -1163,131 +1172,137 @@ function Compare({ repo, db, mutate }: ViewProps) {
     addEventListener("keydown", handler);
     return () => removeEventListener("keydown", handler);
   }, [pair]);
+  const startSetValues =
+    selectedSetChoice.startsWith("preset:")
+      ? presetCatalog.find((preset) => `preset:${preset.slug}` === selectedSetChoice)?.values
+          .length ?? 0
+      : sets.find((set) => set.id === selectedSetChoice)?.value_count ?? 0;
+  const estimatedQuestions = Math.max(
+    1,
+    Math.round((startSetValues || 100) * (55 / 100) * (5 / startChoiceCount)),
+  );
+  const estimatedMinutes = Math.max(
+    1,
+    Math.round((estimatedQuestions * (8 + startChoiceCount * 0.8)) / 60),
+  );
   if (creating || !session)
     return (
-      <Page
-        title="Quiz"
-        description="Start a session."
-      >
-        <div className="grid two-col">
-          <Panel title="Start quiz">
-            <form
-                className="stack"
-                onSubmit={(event) => {
-                  const data = submit(event);
-                  mutate(async () => {
-                    const selectedSetId = setChoice.startsWith("preset:")
-                      ? await repo.importPreset(setChoice.slice("preset:".length))
-                      : setChoice;
-                    const id = await repo.startSession(
-                      selectedSetId,
-                      String(data.get("name")),
-                      data.getAll("contexts").map(String),
-                      sessionMode,
-                    );
-                    localStorage.setItem("values-set", selectedSetId);
-                    setNewSetId(selectedSetId);
-                    setSessionId(id);
-                    setCreating(false);
-                  });
+      <div className="page quiz-home">
+        <form
+          className="quiz-start"
+          onSubmit={(event) => {
+            submit(event);
+            mutate(async () => {
+              const resolvedDomain =
+                quizDomains.find((domain) => domain.id === startDomainId) ?? quizDomains[0];
+              const domainValueSet =
+                resolvedDomain?.valueSetId?.trim() ||
+                startSetChoice ||
+                sets[0]?.id ||
+                `preset:${presetCatalog[0]!.slug}`;
+              const selectedSetId = domainValueSet.startsWith("preset:")
+                ? await repo.importPreset(domainValueSet.slice("preset:".length))
+                : domainValueSet;
+              const contextIds = resolvedDomain?.id && contexts.some((item) => item.id === resolvedDomain.id)
+                ? [resolvedDomain.id]
+                : [];
+              const sessionName = `${resolvedDomain?.name ?? "General"} · ${startChoiceCount} choices`;
+              const id = await repo.startSession(
+                selectedSetId,
+                sessionName,
+                contextIds,
+                sessionMode,
+                {
+                  domainId: resolvedDomain?.id ?? "general-life",
+                  contextPreset: startContextPreset,
+                  contextText: startContextText,
+                  choiceCount: startChoiceCount,
+                },
+              );
+              localStorage.setItem("values-set", selectedSetId);
+              localStorage.setItem("quiz-domain", startDomainId);
+              localStorage.setItem("quiz-context-preset", startContextPreset);
+              localStorage.setItem("quiz-context-details", startContextText);
+              localStorage.setItem("quiz-choice-count", String(startChoiceCount));
+              setSessionId(id);
+              setCreating(false);
+            });
+          }}
+        >
+          <div className="quiz-start-rail">
+            <div className="field">
+              <label htmlFor="domain">Domain</label>
+              <select
+                id="domain"
+                className="select"
+                value={startDomainId}
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setStartDomainId(next);
+                  const domain = quizDomains.find((item) => item.id === next);
+                  if (domain) {
+                    setStartContextPreset(domain.contextPrompt);
+                    if (domain.valueSetId) setStartSetChoice(domain.valueSetId);
+                  }
                 }}
               >
-                <Field label="Session name">
-                  <input className="input" name="name" required />
-                </Field>
-                <Field label="Value set">
-                  <select
-                    className="select"
-                    name="set"
-                    value={setChoice}
-                    onChange={(event) => setNewSetId(event.target.value)}
-                  >
-                    {sets.length > 0 && (
-                      <optgroup label="Your value sets">
-                        {sets.map((set) => (
-                          <option value={set.id} key={set.id}>
-                            {set.name} ({set.value_count} values)
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                    {availablePresets.length > 0 && (
-                      <optgroup label="Start from a preset">
-                        {availablePresets.map((preset) => (
-                          <option value={`preset:${preset.slug}`} key={preset.slug}>
-                            {preset.name} ({preset.values.length} values)
-                          </option>
-                        ))}
-                      </optgroup>
-                    )}
-                  </select>
-                </Field>
-                <div className="notice small">
-                  This session will compare{" "}
-                  <strong>
-                    {setChoiceName}
-                  </strong>
-                  .
-                </div>
-                <div className="field">
-                  <span>Contexts</span>
-                  {contexts.map((context) => (
-                    <label className="check-row" key={context.id}>
-                      <input
-                        type="checkbox"
-                        name="contexts"
-                        value={context.id}
-                        defaultChecked={false}
-                      />{" "}
-                      {context.name}
-                    </label>
-                  ))}
-                </div>
-                <button className="btn btn-primary" type="submit">
-                  Start
-                </button>
-              </form>
-          </Panel>
-          <Panel title="Recent sessions">
-            <div className="stack">
-              {sessions.map((item) => {
-                const adaptive = repo.sessionMode(item.id) !== "exact";
-                return (
-                  <div className="row" key={item.id}>
-                    <button
-                      className="btn spread"
-                      style={{ flex: 1 }}
-                      onClick={() => {
-                        setSessionId(item.id);
-                        setCreating(false);
-                      }}
-                    >
-                      <span>{item.name}</span>
-                      <span className="badge">
-                        {item.status} · {item.completed_count}
-                      </span>
-                    </button>
-                    {adaptive && item.status === "completed" && (
-                      <button
-                        className="btn btn-primary"
-                        aria-label={`Continue ${item.name} until stable`}
-                        onClick={async () => {
-                          await mutate(() => repo.resumeSession(item.id));
-                          setSessionId(item.id);
-                          setCreating(false);
-                        }}
-                      >
-                        <RefreshCw size={14} /> Continue
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
+                {quizDomains.map((domain) => (
+                  <option key={domain.id} value={domain.id}>
+                    {domain.name}
+                  </option>
+                ))}
+              </select>
             </div>
-          </Panel>
-        </div>
-      </Page>
-    );
+            <div className="field">
+              <label htmlFor="context">Context</label>
+              <select
+                id="context"
+                className="select"
+                value={startContextPreset}
+                onChange={(event) => setStartContextPreset(event.target.value)}
+              >
+                <option value={selectedDomain?.contextPrompt ?? ""}>
+                  {selectedDomain?.contextPrompt ?? "General life"}
+                </option>
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="details">Life / work / situation details</label>
+              <textarea
+                id="details"
+                className="textarea"
+                value={startContextText}
+                onChange={(event) => setStartContextText(event.target.value)}
+                placeholder="Tell it about your job, life, situation, or constraints..."
+                rows={3}
+              />
+            </div>
+            <div className="field">
+              <label>Choices per question</label>
+              <div className="choice-toggle" role="group" aria-label="Choices per question">
+                {[2, 3, 4, 5, 6, 7].map((count) => (
+                  <button
+                    key={count}
+                    type="button"
+                    className={`choice-chip ${startChoiceCount === count ? "choice-chip-active" : ""}`}
+                    onClick={() => setStartChoiceCount(count)}
+                  >
+                    {count}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <button className="btn btn-primary quiz-start-button" type="submit">
+            START QUIZ
+          </button>
+          <div className="quiz-start-estimates">
+            <div>About {estimatedQuestions} questions to converge</div>
+            <div>About {Math.max(1, estimatedMinutes - 2)}–{estimatedMinutes + 2} minutes</div>
+          </div>
+        </form>
+      </div>
+      );
   if (activeMode !== "exact" && rapidQuestion)
     return (
       <RapidCompare
@@ -1670,6 +1685,8 @@ function RapidCompare({
       [session.id],
     )
     .map((row) => row.context_id);
+  const settings = repo.settings();
+  const sessionQuizConfig = repo.quizSessionConfig(session.id);
   const contextNames = contexts
     .filter((context) => sessionContextIds.includes(context.id))
     .map((context) => context.name);
@@ -1682,6 +1699,16 @@ function RapidCompare({
       category: value.parent_category,
     })),
     contexts: contextNames,
+    contextText: sessionQuizConfig
+      ? [sessionQuizConfig.contextPreset, sessionQuizConfig.contextText]
+          .map((item) => item.trim())
+          .filter(Boolean)
+          .join(". ")
+      : contextNames.join(", "),
+    domain:
+      settings.quiz.domains.find((domain) => domain.id === sessionQuizConfig?.domainId)?.name ??
+      "General",
+    choiceCount: target.valueIds.length,
     purpose: session.name,
     question: target.question,
   });
@@ -3851,6 +3878,16 @@ function SettingsView({ repo, db, mutate }: ViewProps) {
   const contexts = db.query<ContextRow>(
     "SELECT id,name,description,archived FROM contexts ORDER BY name",
   );
+  const valueSetOptions = [
+    ...repo.sets().map((set) => ({
+      value: set.id,
+      label: `${set.name} (set)`,
+    })),
+    ...presetCatalog.map((preset) => ({
+      value: `preset:${preset.slug}`,
+      label: `${preset.name} (preset)`,
+    })),
+  ];
   return (
     <Page
       title="Settings"
@@ -4082,6 +4119,141 @@ function SettingsView({ repo, db, mutate }: ViewProps) {
         </Panel>
         <div className="stack">
           <ScenarioSettings />
+          <Panel title="Domains">
+            <div className="stack">
+              {settings.quiz.domains.map((domain) => (
+                <form
+                  className="stack domain-card"
+                  key={domain.id}
+                  onSubmit={(event) => {
+                    const data = submit(event);
+                    const nextDomains = settings.quiz.domains.map((item) =>
+                      item.id === domain.id
+                        ? {
+                            ...item,
+                            name: String(data.get("name") ?? item.name).trim() || item.name,
+                            valueSetId: String(data.get("valueSetId") ?? item.valueSetId).trim(),
+                            contextPrompt:
+                              String(data.get("contextPrompt") ?? item.contextPrompt).trim() ||
+                              item.contextPrompt,
+                            archived: Boolean(data.get("archived")),
+                          }
+                        : item,
+                    );
+                    mutate(async () => {
+                      await db.transaction(() => {
+                        db.run(
+                          "UPDATE application_settings SET value=?,updated_at=? WHERE key='quiz'",
+                          [
+                            JSON.stringify({
+                              ...settings.quiz,
+                              domains: nextDomains,
+                            }),
+                            Date.now(),
+                          ],
+                        );
+                      });
+                    });
+                  }}
+                >
+                  <input type="hidden" name="id" value={domain.id} />
+                  <div className="form-grid">
+                    <div className="field">
+                      <label>Name</label>
+                      <input className="input" name="name" defaultValue={domain.name} />
+                    </div>
+                    <div className="field">
+                      <label>Value set</label>
+                      <select className="select" name="valueSetId" defaultValue={domain.valueSetId}>
+                        <option value="">Use current set</option>
+                        {valueSetOptions.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="field">
+                    <label>Default context prompt</label>
+                    <input
+                      className="input"
+                      name="contextPrompt"
+                      defaultValue={domain.contextPrompt}
+                    />
+                  </div>
+                  <label className="check-row small">
+                    <input
+                      type="checkbox"
+                      name="archived"
+                      defaultChecked={Boolean(domain.archived)}
+                    />{" "}
+                    Archived
+                  </label>
+                  <div className="row">
+                    <button className="btn btn-sm btn-primary" type="submit">
+                      Save
+                    </button>
+                  </div>
+                </form>
+              ))}
+              <form
+                className="stack domain-card"
+                onSubmit={(event) => {
+                  const data = submit(event);
+                  const id = String(data.get("id") || uid()).trim();
+                  const nextDomain = {
+                    id,
+                    name: String(data.get("name") ?? "").trim(),
+                    valueSetId: String(data.get("valueSetId") ?? "").trim(),
+                    contextPrompt: String(data.get("contextPrompt") ?? "").trim(),
+                    archived: false,
+                  };
+                  if (!nextDomain.name || !nextDomain.contextPrompt) return;
+                  mutate(async () => {
+                    await db.transaction(() => {
+                      db.run(
+                        "UPDATE application_settings SET value=?,updated_at=? WHERE key='quiz'",
+                        [
+                          JSON.stringify({
+                            ...settings.quiz,
+                            domains: [...settings.quiz.domains, nextDomain],
+                          }),
+                          Date.now(),
+                        ],
+                      );
+                    });
+                  });
+                  event.currentTarget.reset();
+                }}
+              >
+                <div className="form-grid">
+                  <div className="field">
+                    <label>Name</label>
+                    <input className="input" name="name" placeholder="Custom domain" />
+                  </div>
+                  <div className="field">
+                    <label>Value set</label>
+                    <select className="select" name="valueSetId" defaultValue="">
+                      <option value="">Use current set</option>
+                      {valueSetOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="field">
+                  <label>Default context prompt</label>
+                  <input className="input" name="contextPrompt" placeholder="How the scenario should feel" />
+                </div>
+                <button className="btn btn-sm" type="submit">
+                  Add domain
+                </button>
+              </form>
+            </div>
+          </Panel>
           <Panel title="Contexts">
             <div className="stack">
               {contexts.map((context) => (
